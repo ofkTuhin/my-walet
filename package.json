@@ -14,7 +14,6 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "mcp": "tsx mcp/server.ts",
-    "mcp:build": "tsc -p tsconfig.mcp.json",
     "inspect": "npx @modelcontextprotocol/inspector tsx mcp/server.ts"
   },
   "dependencies": {

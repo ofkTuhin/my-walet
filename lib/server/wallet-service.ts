@@ -54,21 +54,25 @@ function dateRangeFilter(startDate?: Date, endDate?: Date): Prisma.DateTimeFilte
  * Matching is case-insensitive so "Groceries" and "groceries" do not become
  * two separate categories; the first spelling seen wins.
  */
-async function resolveCategoryId(name: string, type: TransactionType): Promise<{ id: string; name: string }> {
+async function resolveCategoryId(
+  userId: string,
+  name: string,
+  type: TransactionType,
+): Promise<{ id: string; name: string }> {
   const existing = await prisma.category.findFirst({
-    where: { name: { equals: name, mode: 'insensitive' } },
+    where: { userId, name: { equals: name, mode: 'insensitive' } },
   });
   if (existing) return { id: existing.id, name: existing.name };
 
   // A concurrent insert can win the race between findFirst and create; the
-  // unique constraint on name makes that safe to recover from.
+  // unique constraint on [userId, name] makes that safe to recover from.
   try {
-    const created = await prisma.category.create({ data: { name, type } });
+    const created = await prisma.category.create({ data: { userId, name, type } });
     return { id: created.id, name: created.name };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       const raced = await prisma.category.findFirst({
-        where: { name: { equals: name, mode: 'insensitive' } },
+        where: { userId, name: { equals: name, mode: 'insensitive' } },
       });
       if (raced) return { id: raced.id, name: raced.name };
     }
@@ -76,13 +80,16 @@ async function resolveCategoryId(name: string, type: TransactionType): Promise<{
   }
 }
 
-export async function getWalletSummary(options: {
-  recentLimit: number;
-  startDate?: Date;
-  endDate?: Date;
-}): Promise<WalletSummary> {
+export async function getWalletSummary(
+  userId: string,
+  options: {
+    recentLimit: number;
+    startDate?: Date;
+    endDate?: Date;
+  },
+): Promise<WalletSummary> {
   const dateFilter = dateRangeFilter(options.startDate, options.endDate);
-  const where: Prisma.TransactionWhereInput = dateFilter ? { date: dateFilter } : {};
+  const where: Prisma.TransactionWhereInput = { userId, ...(dateFilter ? { date: dateFilter } : {}) };
 
   const [totals, recent, categoryTotals] = await Promise.all([
     prisma.transaction.groupBy({
@@ -138,11 +145,15 @@ export async function getWalletSummary(options: {
   };
 }
 
-export async function addTransaction(input: AddTransactionInput): Promise<TransactionDTO> {
-  const category = await resolveCategoryId(input.category, input.type);
+export async function addTransaction(
+  userId: string,
+  input: AddTransactionInput,
+): Promise<TransactionDTO> {
+  const category = await resolveCategoryId(userId, input.category, input.type);
 
   const created = await prisma.transaction.create({
     data: {
+      userId,
       type: input.type,
       // Constructing the Decimal from a string avoids inheriting any binary
       // float error already present in the incoming number.
@@ -158,8 +169,12 @@ export async function addTransaction(input: AddTransactionInput): Promise<Transa
 }
 
 /** Builds the dynamic Prisma `where` clause from whichever filters were supplied. */
-export function buildTransactionWhere(filters: SearchTransactionsInput): Prisma.TransactionWhereInput {
-  const where: Prisma.TransactionWhereInput = {};
+export function buildTransactionWhere(
+  userId: string,
+  filters: SearchTransactionsInput,
+): Prisma.TransactionWhereInput {
+  // Seeded first and never overwritten below: every read is tenant-scoped.
+  const where: Prisma.TransactionWhereInput = { userId };
 
   if (filters.type) where.type = filters.type;
   if (filters.category) where.category = { equals: filters.category, mode: 'insensitive' };
@@ -184,8 +199,11 @@ export function buildTransactionWhere(filters: SearchTransactionsInput): Prisma.
   return where;
 }
 
-export async function searchTransactions(filters: SearchTransactionsInput): Promise<SearchResult> {
-  const where = buildTransactionWhere(filters);
+export async function searchTransactions(
+  userId: string,
+  filters: SearchTransactionsInput,
+): Promise<SearchResult> {
+  const where = buildTransactionWhere(userId, filters);
 
   const orderBy: Prisma.TransactionOrderByWithRelationInput[] =
     filters.sortBy === 'date'
@@ -234,37 +252,45 @@ export class TransactionNotFoundError extends Error {
   }
 }
 
-export async function deleteTransaction(id: string): Promise<TransactionDTO> {
-  try {
-    const deleted = await prisma.transaction.delete({ where: { id } });
-    return toTransactionDTO(deleted);
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-      throw new TransactionNotFoundError(id);
-    }
-    throw error;
-  }
+export async function deleteTransaction(userId: string, id: string): Promise<TransactionDTO> {
+  // Read scoped first, so another user's id is indistinguishable from a
+  // missing one — the 404 must not confirm that the row exists.
+  const existing = await prisma.transaction.findFirst({ where: { id, userId } });
+  if (!existing) throw new TransactionNotFoundError(id);
+
+  // Scoped delete rather than delete-by-id: even with the check above, the
+  // write itself must not be able to touch another account's row.
+  const { count } = await prisma.transaction.deleteMany({ where: { id, userId } });
+  if (count === 0) throw new TransactionNotFoundError(id);
+
+  return toTransactionDTO(existing);
 }
 
-export async function listCategories(): Promise<CategoryDTO[]> {
-  const categories = await prisma.category.findMany({ orderBy: { name: 'asc' } });
+export async function listCategories(userId: string): Promise<CategoryDTO[]> {
+  const categories = await prisma.category.findMany({ where: { userId }, orderBy: { name: 'asc' } });
   return categories.map(toCategoryDTO);
 }
 
-export async function createCategory(input: {
-  name: string;
-  type?: TransactionType | null;
-  color?: string | null;
-  icon?: string | null;
-}): Promise<CategoryDTO> {
+export async function createCategory(
+  userId: string,
+  input: {
+    name: string;
+    type?: TransactionType | null;
+    color?: string | null;
+    icon?: string | null;
+  },
+): Promise<CategoryDTO> {
   const category = await prisma.category.upsert({
-    where: { name: input.name },
+    // The composite unique is what makes this an upsert *within* the account
+    // rather than across all accounts.
+    where: { userId_name: { userId, name: input.name } },
     update: {
       ...(input.type !== undefined && { type: input.type }),
       ...(input.color !== undefined && { color: input.color }),
       ...(input.icon !== undefined && { icon: input.icon }),
     },
     create: {
+      userId,
       name: input.name,
       type: input.type ?? null,
       color: input.color ?? null,
@@ -318,11 +344,12 @@ const MONTH_LABELS = [
  * rest of the app stores.
  */
 export async function aggregateForChart(
+  userId: string,
   filters: SearchTransactionsInput,
   groupBy: ChartGroupBy,
 ): Promise<ChartData> {
   const rows = await prisma.transaction.findMany({
-    where: buildTransactionWhere(filters),
+    where: buildTransactionWhere(userId, filters),
     select: { date: true, type: true, amount: true, category: true },
     orderBy: { date: 'asc' },
     take: CHART_ROW_CAP + 1,

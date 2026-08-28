@@ -224,10 +224,15 @@ async function translateWithGroq(question: string, system: string): Promise<Tran
  * Grounding facts. Without these the model guesses at "last month" and at
  * category names, which is the single biggest source of empty result sets.
  */
-async function buildContext(): Promise<string> {
+async function buildContext(userId: string): Promise<string> {
+  // Scoped: without this the prompt would name another account's categories.
   const [categories, range] = await Promise.all([
-    prisma.category.findMany({ select: { name: true, type: true }, orderBy: { name: 'asc' } }),
-    prisma.transaction.aggregate({ _min: { date: true }, _max: { date: true } }),
+    prisma.category.findMany({
+      where: { userId },
+      select: { name: true, type: true },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.transaction.aggregate({ where: { userId }, _min: { date: true }, _max: { date: true } }),
   ]);
 
   const categoryList = categories
@@ -287,11 +292,11 @@ function buildHeadline(filters: SearchTransactionsInput, result: SearchResult): 
   return `${result.totalCount} ${scope} — ${formatMoney(net)} total.`;
 }
 
-export async function askWallet(question: string): Promise<AskResult> {
+export async function askWallet(userId: string, question: string): Promise<AskResult> {
   const provider = resolveProvider();
   if (!provider) throw new AskUnavailableError();
 
-  const system = `${SYSTEM_PROMPT}\n\n${await buildContext()}`;
+  const system = `${SYSTEM_PROMPT}\n\n${await buildContext(userId)}`;
 
   const translation =
     provider === 'groq'
@@ -312,8 +317,8 @@ export async function askWallet(question: string): Promise<AskResult> {
   const presentation = presentationSchema.parse(translation.input);
 
   const [result, chartData] = await Promise.all([
-    searchTransactions(filters),
-    aggregateForChart(filters, presentation.groupBy as ChartGroupBy),
+    searchTransactions(userId, filters),
+    aggregateForChart(userId, filters, presentation.groupBy as ChartGroupBy),
   ]);
 
   log.info(

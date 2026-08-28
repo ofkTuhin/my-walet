@@ -36,19 +36,30 @@ function dateAt(monthsAgo: number, day: number): Date {
 }
 
 async function main() {
+  // Seed data has to belong to somebody. Target the account named by
+  // SEED_CLERK_ID, or the bootstrap account the tenancy migration created.
+  const clerkId = process.env['SEED_CLERK_ID']?.trim() || 'bootstrap';
+  const user = await prisma.user.upsert({
+    where: { clerkId },
+    update: {},
+    create: { clerkId, name: 'Bootstrap account' },
+  });
+  const userId = user.id;
+  console.log(`Seeding into account "${clerkId}" (${userId}).`);
+
   const categoryIds = new Map<string, string>();
 
   for (const category of CATEGORIES) {
     const saved = await prisma.category.upsert({
-      where: { name: category.name },
+      where: { userId_name: { userId, name: category.name } },
       update: { type: category.type, color: category.color, icon: category.icon },
-      create: category,
+      create: { ...category, userId },
     });
     categoryIds.set(saved.name, saved.id);
   }
   console.log(`Seeded ${CATEGORIES.length} categories.`);
 
-  const existing = await prisma.transaction.count();
+  const existing = await prisma.transaction.count({ where: { userId } });
   if (existing > 0) {
     console.log(`Skipping transactions — table already has ${existing} row(s).`);
     return;
@@ -75,6 +86,7 @@ async function main() {
 
   await prisma.transaction.createMany({
     data: rows.map(([type, amount, category, note, date]) => ({
+      userId,
       type,
       amount: new Prisma.Decimal(amount.toFixed(2)),
       category,

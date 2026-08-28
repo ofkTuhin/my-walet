@@ -18,6 +18,23 @@ enum TransactionType {
   EXPENSE
 }
 
+/// An account holder. `clerkId` is the external identity; every other table
+/// hangs off the local `id` so the app never depends on the auth vendor's
+/// identifiers reaching the database layer.
+model User {
+  id        String   @id @default(uuid())
+  clerkId   String   @unique
+  email     String?
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+  categories   Category[]
+
+  @@map("users")
+}
+
 /// A single movement of money in or out of the wallet.
 model Transaction {
   id        String          @id @default(uuid())
@@ -33,15 +50,21 @@ model Transaction {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 
+  /// Owning account. Cascades so closing an account removes its ledger.
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   /// Optional link to the Category catalog. Set to NULL rather than cascading
   /// so deleting a category never destroys financial history.
   categoryId  String?
   categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  @@index([date])
-  @@index([type])
-  @@index([category])
-  @@index([type, date])
+  /// Every index leads with userId: the tenant filter is present on all
+  /// queries, and an index that does not lead with it cannot serve them.
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([userId, category])
+  @@index([userId, type, date])
   @@map("transactions")
 }
 
@@ -49,7 +72,8 @@ model Transaction {
 /// category picker in the dashboard UI.
 model Category {
   id        String           @id @default(uuid())
-  name      String           @unique
+  /// Unique per account, not globally — two people may both keep "Groceries".
+  name      String
   /// Restricts the category to one side of the ledger; NULL means it can be
   /// used for both income and expenses.
   type      TransactionType?
@@ -59,8 +83,13 @@ model Category {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
+  /// Owning account. Cascades so closing an account removes its catalog.
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   transactions Transaction[]
 
-  @@index([type])
+  @@unique([userId, name])
+  @@index([userId, type])
   @@map("categories")
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 
 import { AskNotUnderstoodError, AskUnavailableError } from './ask-service';
+import { UnauthorizedError } from './current-user';
 import { log } from './logger';
 import { formatZodError } from './validation';
 import { TransactionNotFoundError } from './wallet-service';
@@ -16,6 +17,9 @@ export function toErrorResponse(error: unknown): NextResponse {
       { error: 'Validation failed', details: formatZodError(error) },
       { status: 400 },
     );
+  }
+  if (error instanceof UnauthorizedError) {
+    return NextResponse.json({ error: error.message }, { status: 401 });
   }
   if (error instanceof TransactionNotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });

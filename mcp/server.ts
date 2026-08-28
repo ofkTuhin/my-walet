@@ -7,7 +7,7 @@ import {
   type CallToolResult,
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { requireUserId } from '../lib/server/current-user';
+import { resolveStandaloneUserId } from '../lib/server/current-user';
 import { log } from '../lib/server/logger';
 import { callWalletTool, TOOLS } from '../lib/server/mcp-handlers';
 import { prisma } from '../lib/server/prisma';
@@ -34,7 +34,7 @@ let boundUserId: string | null = null;
 
 async function currentUserId(): Promise<string> {
   if (boundUserId) return boundUserId;
-  boundUserId = process.env['WALLET_USER_ID']?.trim() || (await requireUserId());
+  boundUserId = await resolveStandaloneUserId();
   return boundUserId;
 }
 

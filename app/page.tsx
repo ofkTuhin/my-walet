@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertCircle, RefreshCw } from 'lucide-react';
+import { UserButton } from '@clerk/nextjs';
 import { AddTransactionDialog } from '@/components/dashboard/add-transaction-dialog';
 import { AskBar } from '@/components/dashboard/ask-bar';
 import { IncomeExpenseBar } from '@/components/dashboard/income-expense-bar';
@@ -107,6 +108,7 @@ export default function DashboardPage() {
             <RefreshCw />
           </Button>
           <AddTransactionDialog categories={categories} onCreated={refreshAll} />
+          <UserButton />
         </div>
       </header>
 

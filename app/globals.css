@@ -1,0 +1,162 @@
+@import 'tailwindcss';
+
+/*
+ * Shadcn/UI design tokens for Tailwind v4.
+ * Colours are in oklch for perceptually even light/dark pairs.
+ */
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --radius: 0.65rem;
+
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.21 0.02 265);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 265);
+  --primary: oklch(0.55 0.16 265);
+  --primary-foreground: oklch(0.98 0.01 265);
+  --secondary: oklch(0.96 0.008 265);
+  --secondary-foreground: oklch(0.25 0.02 265);
+  --muted: oklch(0.96 0.008 265);
+  --muted-foreground: oklch(0.53 0.02 265);
+  --accent: oklch(0.96 0.01 265);
+  --accent-foreground: oklch(0.25 0.02 265);
+  --destructive: oklch(0.58 0.21 27);
+  --destructive-foreground: oklch(0.98 0.01 265);
+  --border: oklch(0.92 0.008 265);
+  --input: oklch(0.92 0.008 265);
+  --ring: oklch(0.55 0.16 265);
+
+  /* Semantic ledger colours: money in vs money out. */
+  --income: oklch(0.6 0.15 155);
+  --expense: oklch(0.62 0.19 25);
+}
+
+.dark {
+  --background: oklch(0.16 0.015 265);
+  --foreground: oklch(0.96 0.005 265);
+  --card: oklch(0.21 0.018 265);
+  --card-foreground: oklch(0.96 0.005 265);
+  --popover: oklch(0.21 0.018 265);
+  --popover-foreground: oklch(0.96 0.005 265);
+  --primary: oklch(0.7 0.15 265);
+  --primary-foreground: oklch(0.18 0.02 265);
+  --secondary: oklch(0.27 0.02 265);
+  --secondary-foreground: oklch(0.96 0.005 265);
+  --muted: oklch(0.27 0.02 265);
+  --muted-foreground: oklch(0.71 0.015 265);
+  --accent: oklch(0.29 0.02 265);
+  --accent-foreground: oklch(0.96 0.005 265);
+  --destructive: oklch(0.63 0.2 25);
+  --destructive-foreground: oklch(0.98 0.01 265);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.15 265);
+
+  --income: oklch(0.72 0.16 155);
+  --expense: oklch(0.7 0.18 25);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Hide the native spinner on number inputs; amounts are typed, not stepped. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+/* --- Chart palette -------------------------------------------------------
+   Categorical slots assigned in fixed order and never cycled; a 9th series
+   folds into "Other". Both the light and dark sets were validated against
+   their own surface (lightness band, chroma floor, CVD separation, contrast).
+   The income/expense pair sits in the 6-8 CVD band, which is legal only with
+   secondary encoding — hence the always-present legend and direct labels. */
+:root {
+  --chart-income: #1baf7a;
+  --chart-expense: #e34948;
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #4a3aa7;
+  --chart-8: #e34948;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #898781;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --chart-income: #199e70;
+    --chart-expense: #e66767;
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-3: #199e70;
+    --chart-4: #c98500;
+    --chart-5: #d55181;
+    --chart-6: #008300;
+    --chart-7: #9085e9;
+    --chart-8: #e66767;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #898781;
+  }
+}
+
+:root[data-theme='dark'] {
+  --chart-income: #199e70;
+  --chart-expense: #e66767;
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
+  --chart-grid: #2c2c2a;
+  --chart-axis: #898781;
+}

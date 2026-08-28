@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "wallet": {
+      "command": "/Users/devomar-macpro/.nvm/versions/node/v25.3.0/bin/node",
+      "args": [
+        "/Users/devomar-macpro/Desktop/dev/mcp-server/node_modules/tsx/dist/cli.mjs",
+        "/Users/devomar-macpro/Desktop/dev/mcp-server/mcp/server.ts"
+      ]
+    }
+  }
+}

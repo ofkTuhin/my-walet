@@ -1,0 +1,66 @@
+// Prisma schema for the Personal Wallet Management application.
+// Docs: https://pris.ly/d/prisma-schema
+//
+// The datasource URL is supplied by prisma7.config.ts (Prisma 7 reads it from
+// the config file rather than from this schema) and resolves to DATABASE_URL.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Whether money moved into the wallet (INCOME) or out of it (EXPENSE).
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+/// A single movement of money in or out of the wallet.
+model Transaction {
+  id        String          @id @default(uuid())
+  type      TransactionType
+  /// Always stored as a positive magnitude; `type` carries the direction.
+  /// Decimal(12,2) keeps money exact — floats cannot represent 0.10 precisely.
+  amount    Decimal         @db.Decimal(12, 2)
+  /// Denormalised category name, kept on the row so a transaction stays
+  /// readable even if the Category catalog entry is later removed.
+  category  String
+  note      String?
+  date      DateTime
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  /// Optional link to the Category catalog. Set to NULL rather than cascading
+  /// so deleting a category never destroys financial history.
+  categoryId  String?
+  categoryRef Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([type])
+  @@index([category])
+  @@index([type, date])
+  @@map("transactions")
+}
+
+/// Catalog of reusable category names, used for grouping and for the
+/// category picker in the dashboard UI.
+model Category {
+  id        String           @id @default(uuid())
+  name      String           @unique
+  /// Restricts the category to one side of the ledger; NULL means it can be
+  /// used for both income and expenses.
+  type      TransactionType?
+  /// Hex colour used by the dashboard charts and badges.
+  color     String?
+  icon      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  transactions Transaction[]
+
+  @@index([type])
+  @@map("categories")
+}

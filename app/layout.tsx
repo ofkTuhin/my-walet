@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
-import { ClerkProvider } from '@clerk/nextjs';
+
+import { ClerkThemedProvider } from '@/components/clerk-themed-provider';
+import { ThemeProvider, themeInitScript } from '@/components/theme-provider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -9,15 +11,21 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
-        <body
-          className="min-h-screen bg-background font-sans text-foreground antialiased"
-          suppressHydrationWarning
-        >
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* Applies the stored theme before first paint, so a dark-mode user
+            never sees a white flash. Must be inline and before the body. */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body
+        className="min-h-screen bg-background font-sans text-foreground antialiased"
+        suppressHydrationWarning
+      >
+        {/* ThemeProvider wraps Clerk so the widget can follow the resolved theme. */}
+        <ThemeProvider>
+          <ClerkThemedProvider>{children}</ClerkThemedProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   );
 }

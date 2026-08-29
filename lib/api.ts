@@ -33,8 +33,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface PageOptions {
+  limit?: number;
+  offset?: number;
+  sortBy?: 'date' | 'amount' | 'createdAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
 /** Turns the UI filter state into a query string, dropping empty/ALL values. */
-export function filtersToQuery(filters: TransactionFilters, limit = 100): string {
+export function filtersToQuery(
+  filters: TransactionFilters,
+  page: PageOptions | number = {},
+): string {
+  // Historically this took a bare `limit`; keep that call shape working.
+  const opts: PageOptions = typeof page === 'number' ? { limit: page } : page;
   const params = new URLSearchParams();
 
   if (filters.type !== 'ALL') params.set('type', filters.type);
@@ -44,7 +56,10 @@ export function filtersToQuery(filters: TransactionFilters, limit = 100): string
   if (filters.minAmount) params.set('minAmount', filters.minAmount);
   if (filters.maxAmount) params.set('maxAmount', filters.maxAmount);
   if (filters.search) params.set('search', filters.search);
-  params.set('limit', String(limit));
+  params.set('limit', String(opts.limit ?? 100));
+  if (opts.offset) params.set('offset', String(opts.offset));
+  if (opts.sortBy) params.set('sortBy', opts.sortBy);
+  if (opts.sortOrder) params.set('sortOrder', opts.sortOrder);
 
   return params.toString();
 }
@@ -73,8 +88,8 @@ export const api = {
 
   getSummary: () => request<WalletSummary>('/summary?recentLimit=5'),
 
-  searchTransactions: (filters: TransactionFilters) =>
-    request<SearchResult>(`/transactions?${filtersToQuery(filters)}`),
+  searchTransactions: (filters: TransactionFilters, page?: PageOptions) =>
+    request<SearchResult>(`/transactions?${filtersToQuery(filters, page ?? {})}`),
 
   getCategories: () => request<Category[]>('/categories'),
 

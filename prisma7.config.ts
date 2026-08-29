@@ -23,7 +23,14 @@ loadDotenv({ quiet: true });
  */
 const migrationUrl = process.env['DIRECT_URL'] || process.env['DATABASE_URL'];
 
-if (migrationUrl?.includes('-pooler')) {
+// Only migration commands need a direct connection. `prisma generate` reads
+// nothing from the database, and this config is loaded for every CLI command —
+// guarding unconditionally would break `generate`, and with it every build.
+const isMigrationCommand = process.argv.some(
+  (arg) => arg === 'migrate' || arg === 'db' || arg === 'migrate-deploy',
+);
+
+if (isMigrationCommand && migrationUrl?.includes('-pooler')) {
   throw new Error(
     'Refusing to run migrations through a connection pooler.\n\n' +
       'The URL contains "-pooler", which makes the schema engine fail with\n' +

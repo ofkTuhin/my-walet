@@ -17,8 +17,12 @@ const EXAMPLES = [
 ];
 
 interface AskBarProps {
-  /** Applies the filters Claude derived to the dashboard's filter controls. */
-  onFilters: (filters: TransactionFilters) => void;
+  /**
+   * Applies the filters the model derived to the page's filter controls.
+   * Optional: on the dashboard the answer and its chart are the whole point,
+   * and there are no filter controls to drive.
+   */
+  onFilters?: (filters: TransactionFilters) => void;
 }
 
 export function AskBar({ onFilters }: AskBarProps) {
@@ -37,7 +41,7 @@ export function AskBar({ onFilters }: AskBarProps) {
 
     try {
       const response = await api.ask(trimmed);
-      onFilters(askFiltersToUiFilters(response.filters));
+      onFilters?.(askFiltersToUiFilters(response.filters));
       setAnswer(response);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');

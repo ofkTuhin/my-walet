@@ -7,12 +7,32 @@ loadDotenv({ path: '.env.local', quiet: true });
 loadDotenv({ quiet: true });
 
 /**
- * Migrations must not go through a connection pooler — PgBouncer in transaction
- * mode cannot run the advisory locks and DDL a migration needs. On Neon, set
- * DIRECT_URL to the unpooled string (no "-pooler" in the host) and leave
- * DATABASE_URL as the pooled one the app runs on.
+ * Migrations must not run through a connection pooler.
+ *
+ * Through Neon's pooler the session has no `search_path`, so the schema engine
+ * cannot see `public._prisma_migrations`. It then reports every migration as
+ * unapplied and fails with:
+ *
+ *   Invariant violation: migration persistence is not initialized
+ *
+ * The app's own queries are unaffected — Prisma schema-qualifies them — so this
+ * only ever bites at migrate time.
+ *
+ * Set DIRECT_URL to the unpooled connection string (the same host without
+ * "-pooler") and leave DATABASE_URL as the pooled one the app runs on.
  */
 const migrationUrl = process.env['DIRECT_URL'] || process.env['DATABASE_URL'];
+
+if (migrationUrl?.includes('-pooler')) {
+  throw new Error(
+    'Refusing to run migrations through a connection pooler.\n\n' +
+      'The URL contains "-pooler", which makes the schema engine fail with\n' +
+      '"migration persistence is not initialized".\n\n' +
+      'Set DIRECT_URL to the unpooled string — the same URL with "-pooler"\n' +
+      'removed from the host — and keep DATABASE_URL pooled for the app.\n' +
+      'On Vercel: Settings -> Environment Variables -> add DIRECT_URL.',
+  );
+}
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',

@@ -84,11 +84,13 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-6">
-        <SummaryCards summary={summary} loading={loading} />
-
-        <div className="animate-enter" style={{ animationDelay: '140ms' }}>
+        {/* Asking is the fastest route to an answer, so it leads the page and
+            enters first; the figures below are the fallback, not the headline. */}
+        <div className="animate-enter">
           <AskBar />
         </div>
+
+        <SummaryCards summary={summary} loading={loading} startDelay={90} />
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* min-w-0: a grid item defaults to min-width:auto, so a wide child

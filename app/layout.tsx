@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 
+import { AmbientBackground } from '@/components/ambient-background';
 import { ClerkThemedProvider } from '@/components/clerk-themed-provider';
 import { ThemeProvider, themeInitScript } from '@/components/theme-provider';
 import './globals.css';
@@ -18,9 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body
-        className="min-h-screen bg-background font-sans text-foreground antialiased"
+        className="min-h-screen font-sans text-foreground antialiased"
         suppressHydrationWarning
       >
+        <AmbientBackground />
         {/* ThemeProvider wraps Clerk so the widget can follow the resolved theme. */}
         <ThemeProvider>
           <ClerkThemedProvider>{children}</ClerkThemedProvider>

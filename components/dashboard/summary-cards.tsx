@@ -9,6 +9,8 @@ import type { WalletSummary } from '@/lib/types';
 interface SummaryCardsProps {
   summary: WalletSummary | null;
   loading: boolean;
+  /** Offsets the stagger so the cards follow whatever enters above them. */
+  startDelay?: number;
 }
 
 /** Cards arrive in sequence rather than all at once; short enough not to wait on. */
@@ -22,6 +24,7 @@ function StatCard({
   icon,
   valueClassName,
   index,
+  startDelay,
 }: {
   title: string;
   value: number;
@@ -30,6 +33,7 @@ function StatCard({
   icon: React.ReactNode;
   valueClassName?: string;
   index: number;
+  startDelay: number;
 }) {
   return (
     <Card
@@ -37,7 +41,7 @@ function StatCard({
         'group animate-enter transition-[transform,box-shadow,border-color] duration-200',
         'hover:border-foreground/15 hover:-translate-y-0.5 hover:shadow-md',
       )}
-      style={{ animationDelay: `${index * STAGGER_MS}ms` }}
+      style={{ animationDelay: `${startDelay + index * STAGGER_MS}ms` }}
     >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
@@ -57,9 +61,9 @@ function StatCard({
   );
 }
 
-function SkeletonCard({ index }: { index: number }) {
+function SkeletonCard({ index, startDelay }: { index: number; startDelay: number }) {
   return (
-    <Card className="animate-enter" style={{ animationDelay: `${index * STAGGER_MS}ms` }}>
+    <Card className="animate-enter" style={{ animationDelay: `${startDelay + index * STAGGER_MS}ms` }}>
       <CardHeader className="pb-2">
         <div className="skeleton h-4 w-24 rounded" />
       </CardHeader>
@@ -71,12 +75,12 @@ function SkeletonCard({ index }: { index: number }) {
   );
 }
 
-export function SummaryCards({ summary, loading }: SummaryCardsProps) {
+export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsProps) {
   if (loading || !summary) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <SkeletonCard key={i} index={i} />
+          <SkeletonCard key={i} index={i} startDelay={startDelay} />
         ))}
       </div>
     );
@@ -96,6 +100,7 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         index={0}
+        startDelay={startDelay}
         title="Current balance"
         value={balance}
         format={money}
@@ -105,6 +110,7 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
       />
       <StatCard
         index={1}
+        startDelay={startDelay}
         title="Total income"
         value={totalIncome}
         format={money}
@@ -114,6 +120,7 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
       />
       <StatCard
         index={2}
+        startDelay={startDelay}
         title="Total expense"
         value={totalExpense}
         format={money}
@@ -123,6 +130,7 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
       />
       <StatCard
         index={3}
+        startDelay={startDelay}
         title="All transactions"
         value={transactionCount}
         format={whole}

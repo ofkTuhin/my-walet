@@ -20,7 +20,10 @@
   --secondary: oklch(0.96 0.008 265);
   --secondary-foreground: oklch(0.25 0.02 265);
   --muted: oklch(0.96 0.008 265);
-  --muted-foreground: oklch(0.53 0.02 265);
+  /* Was 0.53, which put secondary text at 4.74:1 on the page background —
+     over the 4.5 line, but with nothing to spare. The ambient wash needs a
+     little room, and this is worth having regardless. */
+  --muted-foreground: oklch(0.49 0.02 265);
   --accent: oklch(0.96 0.01 265);
   --accent-foreground: oklch(0.25 0.02 265);
   --destructive: oklch(0.58 0.21 27);
@@ -92,8 +95,13 @@
   * {
     border-color: var(--border);
   }
-  body {
+  /* The page colour lives on <html>, not <body>, so the ambient layer below
+     can sit behind the content without being covered by the body's own
+     background box. */
+  html {
     background-color: var(--background);
+  }
+  body {
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
   }
@@ -153,12 +161,14 @@
   /* The theme switch repaints large surfaces; a short transition keeps that
      from reading as a flash. Deliberately excludes transform so it cannot
      interfere with component animations. */
+  html,
   body {
     transition:
       background-color 150ms ease,
       color 150ms ease;
   }
   @media (prefers-reduced-motion: reduce) {
+    html,
     body {
       transition: none;
     }
@@ -258,5 +268,132 @@
   }
   .animate-pulse {
     animation-duration: 2s !important;
+  }
+}
+
+/* --- Ambient background ---------------------------------------------------
+   Three soft colour fields drifting behind the app. Radial gradients rather
+   than blurred shapes: a `filter: blur()` over a viewport-sized element is
+   expensive to composite, while a gradient with a transparent stop is free and
+   just as soft. Only `transform` animates, so this never triggers layout.
+
+   Kept faint on purpose — it should register as depth, not as decoration
+   competing with the numbers.
+
+   The fields tint hue at close to the page's own lightness rather than
+   compositing the raw brand colour over it. That distinction matters: a wash
+   that darkens the light background costs contrast, and muted-foreground text
+   only starts at 4.74:1 against the plain background, so there is no margin to
+   spend. Measured worst case is recorded in the commit. */
+
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  /* Contains the drifting fields so they can never widen the page. */
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.ambient-field {
+  position: absolute;
+  display: block;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 9999px;
+  will-change: transform;
+}
+
+.ambient-field-1 {
+  top: -22vmax;
+  left: -18vmax;
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--primary) 0.93 calc(c * 0.55) h / 0.62),
+    transparent
+  );
+  animation: ambient-drift-1 34s var(--ease-out-quart) infinite alternate;
+}
+
+.ambient-field-2 {
+  top: 10vmax;
+  right: -26vmax;
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--income) 0.94 calc(c * 0.5) h / 0.55),
+    transparent
+  );
+  animation: ambient-drift-2 43s var(--ease-out-quart) infinite alternate;
+}
+
+.ambient-field-3 {
+  bottom: -30vmax;
+  left: 20vmax;
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--expense) 0.94 calc(c * 0.45) h / 0.5),
+    transparent
+  );
+  animation: ambient-drift-3 51s var(--ease-out-quart) infinite alternate;
+}
+
+/* Dark surfaces swallow a wash that reads clearly on white, so the fields are
+   given back a little intensity rather than disappearing. */
+.dark .ambient-field-1 {
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--primary) 0.34 calc(c * 0.85) h / 0.6),
+    transparent
+  );
+}
+.dark .ambient-field-2 {
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--income) 0.32 calc(c * 0.8) h / 0.5),
+    transparent
+  );
+}
+.dark .ambient-field-3 {
+  background: radial-gradient(
+    circle closest-side,
+    oklch(from var(--expense) 0.32 calc(c * 0.75) h / 0.45),
+    transparent
+  );
+}
+
+/* Long, unsynchronised cycles on `alternate`, so the fields never line up into
+   a visible loop and never snap back to a start position. */
+@keyframes ambient-drift-1 {
+  from {
+    transform: translate3d(-6%, -4%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(8%, 10%, 0) scale(1.2);
+  }
+}
+
+@keyframes ambient-drift-2 {
+  from {
+    transform: translate3d(4%, 6%, 0) scale(1.12);
+  }
+  to {
+    transform: translate3d(-9%, -7%, 0) scale(1);
+  }
+}
+
+@keyframes ambient-drift-3 {
+  from {
+    transform: translate3d(-5%, 4%, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(10%, -6%, 0) scale(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* `animation-duration: 1ms` from the rule above would loop these a thousand
+     times a second. They stop outright instead, leaving the colour in place. */
+  .ambient-field {
+    animation: none !important;
   }
 }

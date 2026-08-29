@@ -59,13 +59,15 @@ export function TransactionTable({ result, loading, onDelete }: TransactionTable
         ) : (
           <Table>
             <TableHeader>
+              {/* Same priority order as the full transactions table: note goes
+                  first, then type and category fold into the date cell. */}
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="w-12" />
+                <TableHead className="px-3 sm:px-4">Date</TableHead>
+                <TableHead className="hidden sm:table-cell">Type</TableHead>
+                <TableHead className="hidden sm:table-cell">Category</TableHead>
+                <TableHead className="hidden lg:table-cell">Note</TableHead>
+                <TableHead className="px-3 text-right sm:px-4">Amount</TableHead>
+                <TableHead className="w-12 px-1 sm:px-4" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -81,26 +83,36 @@ export function TransactionTable({ result, loading, onDelete }: TransactionTable
                       deleting && 'pointer-events-none opacity-40 grayscale',
                     )}
                   >
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDate(transaction.date)}
+                    <TableCell className="px-3 text-muted-foreground sm:px-4">
+                      <span className="whitespace-nowrap">{formatDate(transaction.date)}</span>
+                      <span className="mt-1 flex items-center gap-2 sm:hidden">
+                        <Badge variant={isIncome ? 'income' : 'expense'}>
+                          {isIncome ? 'Income' : 'Expense'}
+                        </Badge>
+                        <span className="truncate font-medium text-foreground">
+                          {transaction.category}
+                        </span>
+                      </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Badge variant={isIncome ? 'income' : 'expense'}>
                         {isIncome ? 'Income' : 'Expense'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="font-medium">{transaction.category}</TableCell>
-                    <TableCell className="max-w-64 truncate text-muted-foreground">
+                    <TableCell className="hidden font-medium sm:table-cell">
+                      {transaction.category}
+                    </TableCell>
+                    <TableCell className="hidden max-w-64 truncate text-muted-foreground lg:table-cell">
                       {transaction.note || '—'}
                     </TableCell>
                     <TableCell
-                      className="whitespace-nowrap text-right font-medium tabular-nums"
+                      className="whitespace-nowrap px-3 text-right font-medium tabular-nums sm:px-4"
                       style={{ color: isIncome ? 'var(--income)' : 'var(--expense)' }}
                     >
                       {isIncome ? '+' : '−'}
                       {formatCurrency(transaction.amount)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-1 sm:px-4">
                       <Button
                         variant="ghost"
                         size="icon"

@@ -1,12 +1,14 @@
 'use client';
 
-import { X } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { EMPTY_FILTERS, type Category, type TransactionFilters } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 interface FiltersProps {
   filters: TransactionFilters;
@@ -19,15 +21,58 @@ interface FiltersProps {
  * dashboard and an AI assistant can express exactly the same queries.
  */
 export function TransactionFiltersBar({ filters, categories, onChange }: FiltersProps) {
+  // Collapsed on phones by default. Expanded, this form is taller than the
+  // viewport, which pushed the transactions themselves off the first screen.
+  const [open, setOpen] = useState(false);
+
   const set = <K extends keyof TransactionFilters>(key: K, value: TransactionFilters[K]) =>
     onChange({ ...filters, [key]: value });
 
   const isDirty = JSON.stringify(filters) !== JSON.stringify(EMPTY_FILTERS);
+  const activeCount = (Object.keys(filters) as Array<keyof TransactionFilters>).filter(
+    (key) => filters[key] !== EMPTY_FILTERS[key],
+  ).length;
 
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Only a control below md; from md up the form is always visible. */}
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          aria-expanded={open}
+          aria-controls="transaction-filters"
+          className={cn(
+            'flex w-full items-center gap-2 text-sm font-medium md:hidden',
+            'transition-colors duration-200',
+            open ? 'mb-4' : '',
+          )}
+        >
+          <SlidersHorizontal className="h-4 w-4 shrink-0" />
+          Filters
+          {activeCount > 0 ? (
+            <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs tabular-nums">
+              {activeCount}
+            </span>
+          ) : null}
+          <span
+            aria-hidden
+            className={cn(
+              'text-muted-foreground ml-auto transition-transform duration-300',
+              open && 'rotate-180',
+            )}
+          >
+            ▾
+          </span>
+        </button>
+
+        <div
+          id="transaction-filters"
+          className={cn(
+            'grid gap-4 md:grid-cols-2 lg:grid-cols-4',
+            open ? 'grid' : 'hidden md:grid',
+          )}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="filter-search">Search</Label>
             <Input

@@ -168,9 +168,11 @@ export function AppShell({ title, actions, children }: {
             <Menu className="h-4 w-4" />
           </button>
 
-          <h1 className="truncate text-sm font-semibold tracking-tight sm:text-base">{title}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight sm:text-base">
+            {title}
+          </h1>
 
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {actions}
             <ThemeToggle />
             <UserButton />

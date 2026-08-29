@@ -45,9 +45,10 @@ export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null })
       <CardContent className="space-y-4">
         {rows.map((row) => (
           <div key={row.label} className="space-y-1.5">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="text-muted-foreground">{row.label}</span>
-              <span style={{ color: row.color }}>
+            <div className="flex items-baseline justify-between gap-2 text-sm">
+              <span className="text-muted-foreground truncate">{row.label}</span>
+              {/* shrink-0: the figure is the point of the row and never truncates. */}
+              <span className="shrink-0" style={{ color: row.color }}>
                 <AnimatedNumber
                   value={row.value}
                   format={(value) => formatCurrency(value, currency)}
@@ -73,10 +74,10 @@ export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null })
               {summary.topCategories.slice(0, 4).map((category, index) => (
                 <li
                   key={`${category.category}-${category.type}`}
-                  className="animate-enter flex justify-between text-sm"
+                  className="animate-enter flex justify-between gap-2 text-sm"
                   style={{ animationDelay: `${200 + index * 60}ms` }}
                 >
-                  <span className="truncate text-muted-foreground">
+                  <span className="min-w-0 truncate text-muted-foreground">
                     {category.category}
                     <span className="ml-1.5 text-xs opacity-60">({category.count})</span>
                   </span>

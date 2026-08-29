@@ -94,8 +94,11 @@ export function AddTransactionDialog({ categories, onCreated }: AddTransactionDi
       }}
     >
       <DialogTrigger asChild>
-        <Button>
-          <Plus /> Add transaction
+        {/* The label is dropped on phones, where the whole action cluster does
+            not fit; the icon and the accessible name still carry it. */}
+        <Button aria-label="Add transaction" className="max-sm:h-9 max-sm:w-9 max-sm:p-0">
+          <Plus />
+          <span className="max-sm:hidden">Add transaction</span>
         </Button>
       </DialogTrigger>
 

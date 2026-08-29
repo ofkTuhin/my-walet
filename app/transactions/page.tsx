@@ -103,7 +103,7 @@ export default function TransactionsPage() {
   function SortHeader({ column, label, align }: { column: SortBy; label: string; align?: 'right' }) {
     const active = sortBy === column;
     return (
-      <th className={cn('px-4 py-2', align === 'right' ? 'text-right' : 'text-left')}>
+      <th className={cn('px-3 py-2 sm:px-4', align === 'right' ? 'text-right' : 'text-left')}>
         <button
           type="button"
           onClick={() => toggleSort(column)}
@@ -136,6 +136,7 @@ export default function TransactionsPage() {
             variant="outline"
             size="icon"
             aria-label="Refresh"
+            className="max-sm:hidden"
             onClick={() => void load(filters, { limit: pageSize, offset, sortBy, sortOrder })}
           >
             <RefreshCw />
@@ -166,13 +167,16 @@ export default function TransactionsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-muted-foreground border-b text-xs">
+                {/* Columns drop in priority order as the viewport narrows:
+                    note first, then type and category — which reappear inside
+                    the date cell rather than being lost. */}
                 <tr>
                   <SortHeader column="date" label="Date" />
-                  <th className="px-4 py-2 text-left font-medium">Type</th>
-                  <th className="px-4 py-2 text-left font-medium">Category</th>
-                  <th className="px-4 py-2 text-left font-medium">Note</th>
+                  <th className="hidden px-4 py-2 text-left font-medium sm:table-cell">Type</th>
+                  <th className="hidden px-4 py-2 text-left font-medium sm:table-cell">Category</th>
+                  <th className="hidden px-4 py-2 text-left font-medium lg:table-cell">Note</th>
                   <SortHeader column="amount" label="Amount" align="right" />
-                  <th className="px-4 py-2" />
+                  <th className="px-3 py-2 sm:px-4" />
                 </tr>
               </thead>
               <tbody>
@@ -199,28 +203,36 @@ export default function TransactionsPage() {
                         deletingId === t.id && 'pointer-events-none opacity-40 grayscale',
                       )}
                     >
-                      <td className="text-muted-foreground px-4 py-3 whitespace-nowrap tabular-nums">
-                        {formatDate(t.date)}
+                      <td className="text-muted-foreground px-3 py-3 tabular-nums sm:px-4">
+                        <span className="whitespace-nowrap">{formatDate(t.date)}</span>
+                        {/* Carries the hidden columns on small screens, so a row
+                            still says what it was and which way the money went. */}
+                        <span className="mt-1 flex items-center gap-2 sm:hidden">
+                          <Badge variant={t.type === 'INCOME' ? 'income' : 'expense'}>
+                            {t.type === 'INCOME' ? 'Income' : 'Expense'}
+                          </Badge>
+                          <span className="text-foreground truncate font-medium">{t.category}</span>
+                        </span>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="hidden px-4 py-3 sm:table-cell">
                         <Badge variant={t.type === 'INCOME' ? 'income' : 'expense'}>
                           {t.type === 'INCOME' ? 'Income' : 'Expense'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 font-medium">{t.category}</td>
-                      <td className="text-muted-foreground max-w-[20rem] truncate px-4 py-3">
+                      <td className="hidden px-4 py-3 font-medium sm:table-cell">{t.category}</td>
+                      <td className="text-muted-foreground hidden max-w-[20rem] truncate px-4 py-3 lg:table-cell">
                         {t.note || '—'}
                       </td>
                       <td
                         className={cn(
-                          'px-4 py-3 text-right font-medium tabular-nums',
+                          'px-3 py-3 text-right font-medium whitespace-nowrap tabular-nums sm:px-4',
                           t.type === 'INCOME' ? 'text-[var(--income)]' : 'text-[var(--expense)]',
                         )}
                       >
                         {t.type === 'INCOME' ? '+' : '−'}
                         {formatCurrency(t.amount)}
                       </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-1 py-3 text-right sm:px-4">
                         <Button
                           variant="ghost"
                           size="sm"

@@ -57,7 +57,13 @@ export default function DashboardPage() {
       title="Dashboard"
       actions={
         <>
-          <Button variant="outline" size="icon" aria-label="Refresh" onClick={() => void refreshAll()}>
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label="Refresh"
+            className="max-sm:hidden"
+            onClick={() => void refreshAll()}
+          >
             <RefreshCw />
           </Button>
           <AddTransactionDialog categories={categories} onCreated={refreshAll} />
@@ -85,11 +91,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="animate-enter lg:col-span-1" style={{ animationDelay: '200ms' }}>
+          {/* min-w-0: a grid item defaults to min-width:auto, so a wide child
+              (the table) sizes the whole column and pushes the page sideways. */}
+          <div className="animate-enter min-w-0 lg:col-span-1" style={{ animationDelay: '200ms' }}>
             <IncomeExpenseBar summary={summary} />
           </div>
 
-          <div className="animate-enter space-y-3 lg:col-span-2" style={{ animationDelay: '260ms' }}>
+          <div className="animate-enter min-w-0 space-y-3 lg:col-span-2" style={{ animationDelay: '260ms' }}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">Recent activity</h2>
               <Link

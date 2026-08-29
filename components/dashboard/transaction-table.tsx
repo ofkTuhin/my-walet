@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import type { SearchResult } from '@/lib/types';
 
 interface TransactionTableProps {
@@ -50,7 +50,7 @@ export function TransactionTable({ result, loading, onDelete }: TransactionTable
             Loading transactions…
           </div>
         ) : transactions.length === 0 ? (
-          <div className="px-6 py-16 text-center">
+          <div className="animate-enter px-6 py-16 text-center">
             <p className="text-sm font-medium">No transactions found</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Try clearing the filters, or add your first transaction.
@@ -69,10 +69,18 @@ export function TransactionTable({ result, loading, onDelete }: TransactionTable
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactions.map((transaction) => {
+              {transactions.map((transaction, index) => {
                 const isIncome = transaction.type === 'INCOME';
+                const deleting = deletingId === transaction.id;
                 return (
-                  <TableRow key={transaction.id}>
+                  <TableRow
+                    key={transaction.id}
+                    style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
+                    className={cn(
+                      'animate-enter transition-[background-color,opacity,filter] duration-200',
+                      deleting && 'pointer-events-none opacity-40 grayscale',
+                    )}
+                  >
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatDate(transaction.date)}
                     </TableCell>

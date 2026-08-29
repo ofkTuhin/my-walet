@@ -164,3 +164,99 @@
     }
   }
 }
+
+/* --- Motion ---------------------------------------------------------------
+   One vocabulary for the whole app: two easings, a small set of entrances,
+   and durations short enough that a returning user never waits on them.
+   Every value is transform/opacity so animation stays off the layout path. */
+
+@theme {
+  /* Decelerating: fast start, soft landing. The default for anything entering. */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  /* A slight overshoot, reserved for direct manipulation (the theme thumb). */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --animate-enter: enter 0.38s var(--ease-out-quart) both;
+  --animate-enter-scale: enter-scale 0.26s var(--ease-out-quart) both;
+  --animate-indeterminate: indeterminate 1.15s ease-in-out infinite;
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes enter-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+/* An indeterminate sweep: the model call has no measurable progress, so the
+   bar reports "still working" rather than pretending to know how far along. */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%) scaleX(0.4);
+  }
+  50% {
+    transform: translateX(25%) scaleX(0.65);
+  }
+  100% {
+    transform: translateX(120%) scaleX(0.4);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@layer components {
+  /* A loading placeholder that sweeps instead of blinking. The sweep reads as
+     "data is coming"; a pulse reads as "something is wrong". */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: var(--muted);
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklch, var(--foreground) 9%, transparent),
+      transparent
+    );
+    animation: shimmer 1.5s var(--ease-out-quart) infinite;
+  }
+}
+
+/* Honour the OS setting. Motion here is decoration on top of a layout that
+   already works, so it can all be removed without losing meaning — except
+   the loading indicators, which carry information and keep running. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+  .skeleton::after {
+    display: none;
+  }
+  .animate-spin {
+    animation-duration: 1s !important;
+  }
+  .animate-pulse {
+    animation-duration: 2s !important;
+  }
+}

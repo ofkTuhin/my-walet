@@ -116,7 +116,11 @@ export default function TransactionsPage() {
         >
           {label}
           {active ? (
-            sortOrder === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+            sortOrder === 'asc' ? (
+              <ArrowUp className="animate-enter-scale h-3 w-3" />
+            ) : (
+              <ArrowDown className="animate-enter-scale h-3 w-3" />
+            )
           ) : null}
         </button>
       </th>
@@ -151,7 +155,7 @@ export default function TransactionsPage() {
         {error && (
           <div
             role="alert"
-            className="border-destructive/30 bg-destructive/10 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
+            className="border-destructive/30 bg-destructive/10 animate-enter flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
           >
             <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
             <p className="text-destructive">{error}</p>
@@ -176,13 +180,25 @@ export default function TransactionsPage() {
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b last:border-0">
                       <td colSpan={6} className="px-4 py-3">
-                        <div className="bg-muted h-4 w-full animate-pulse rounded" />
+                        <div className="skeleton h-4 w-full rounded" />
                       </td>
                     </tr>
                   ))
                 ) : result && result.transactions.length > 0 ? (
-                  result.transactions.map((t) => (
-                    <tr key={t.id} className="hover:bg-accent/40 border-b transition-colors last:border-0">
+                  result.transactions.map((t, index) => (
+                    <tr
+                      key={t.id}
+                      // Capped: past a dozen rows the stagger stops reading as
+                      // sequence and starts reading as lag.
+                      style={{ animationDelay: `${Math.min(index, 12) * 25}ms` }}
+                      className={cn(
+                        'animate-enter hover:bg-accent/40 border-b last:border-0',
+                        'transition-[background-color,opacity,filter] duration-200',
+                        // The row dims while its delete is in flight, so the
+                        // feedback is on the thing being removed.
+                        deletingId === t.id && 'pointer-events-none opacity-40 grayscale',
+                      )}
+                    >
                       <td className="text-muted-foreground px-4 py-3 whitespace-nowrap tabular-nums">
                         {formatDate(t.date)}
                       </td>
@@ -219,7 +235,7 @@ export default function TransactionsPage() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="text-muted-foreground px-4 py-12 text-center">
+                    <td colSpan={6} className="text-muted-foreground animate-enter px-4 py-12 text-center">
                       <p className="font-medium">No transactions found</p>
                       <p className="mt-1 text-xs">Try clearing the filters, or add your first one.</p>
                     </td>

@@ -67,7 +67,7 @@ export default function DashboardPage() {
       {error && (
         <div
           role="alert"
-          className="border-destructive/30 bg-destructive/10 mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
+          className="border-destructive/30 bg-destructive/10 animate-enter mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm"
         >
           <AlertCircle className="text-destructive mt-0.5 h-4 w-4 shrink-0" />
           <div>
@@ -80,21 +80,26 @@ export default function DashboardPage() {
       <div className="space-y-6">
         <SummaryCards summary={summary} loading={loading} />
 
-        <AskBar />
+        <div className="animate-enter" style={{ animationDelay: '140ms' }}>
+          <AskBar />
+        </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1">
+          <div className="animate-enter lg:col-span-1" style={{ animationDelay: '200ms' }}>
             <IncomeExpenseBar summary={summary} />
           </div>
 
-          <div className="space-y-3 lg:col-span-2">
+          <div className="animate-enter space-y-3 lg:col-span-2" style={{ animationDelay: '260ms' }}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold tracking-tight">Recent activity</h2>
               <Link
                 href="/transactions"
-                className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+                className="text-muted-foreground hover:text-foreground group text-xs transition-colors"
               >
-                View all →
+                View all{' '}
+                <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
+                  →
+                </span>
               </Link>
             </div>
             <TransactionTable result={recent} loading={loading} onDelete={handleDelete} />

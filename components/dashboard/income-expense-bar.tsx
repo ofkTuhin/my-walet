@@ -1,6 +1,8 @@
 'use client';
 
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMountedFlag } from '@/lib/hooks/use-motion';
 import { formatCurrency } from '@/lib/utils';
 import type { WalletSummary } from '@/lib/types';
 
@@ -9,8 +11,14 @@ import type { WalletSummary } from '@/lib/types';
  *
  * Bars are scaled against the larger of the two values so the dominant side
  * always fills the track and the ratio between them stays readable.
+ *
+ * They also grow into place on first paint: watching the two tracks fill to
+ * different lengths makes the ratio land harder than seeing it already drawn.
  */
 export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null }) {
+  // Called before the early return: hooks cannot sit behind a condition.
+  const grown = useMountedFlag();
+
   if (!summary) return null;
 
   const { totalIncome, totalExpense, currency } = summary;
@@ -39,14 +47,18 @@ export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null })
           <div key={row.label} className="space-y-1.5">
             <div className="flex items-baseline justify-between text-sm">
               <span className="text-muted-foreground">{row.label}</span>
-              <span className="font-medium tabular-nums" style={{ color: row.color }}>
-                {formatCurrency(row.value, currency)}
+              <span style={{ color: row.color }}>
+                <AnimatedNumber
+                  value={row.value}
+                  format={(value) => formatCurrency(value, currency)}
+                  className="font-medium"
+                />
               </span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full transition-[width] duration-500"
-                style={{ width: `${row.width}%`, backgroundColor: row.color }}
+                className="h-full rounded-full transition-[width] duration-700 ease-out-quart"
+                style={{ width: grown ? `${row.width}%` : '0%', backgroundColor: row.color }}
               />
             </div>
           </div>
@@ -58,8 +70,12 @@ export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null })
               Top categories
             </p>
             <ul className="space-y-2">
-              {summary.topCategories.slice(0, 4).map((category) => (
-                <li key={`${category.category}-${category.type}`} className="flex justify-between text-sm">
+              {summary.topCategories.slice(0, 4).map((category, index) => (
+                <li
+                  key={`${category.category}-${category.type}`}
+                  className="animate-enter flex justify-between text-sm"
+                  style={{ animationDelay: `${200 + index * 60}ms` }}
+                >
                   <span className="truncate text-muted-foreground">
                     {category.category}
                     <span className="ml-1.5 text-xs opacity-60">({category.count})</span>

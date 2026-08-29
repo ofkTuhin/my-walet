@@ -6,7 +6,8 @@ import { AppShell } from '@/components/shell/app-shell';
 import { Badge } from '@/components/ui/badge';
 import { api } from '@/lib/api';
 import { EMPTY_FILTERS, type Category, type SearchResult } from '@/lib/types';
-import { formatCurrency } from '@/lib/utils';
+import { AnimatedNumber } from '@/components/ui/animated-number';
+import { cn, formatCurrency } from '@/lib/utils';
 
 /** Categories, each with what has actually been spent through it. */
 export default function CategoriesPage() {
@@ -46,22 +47,31 @@ export default function CategoriesPage() {
       {loading ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-muted h-24 animate-pulse rounded-xl" />
+            <div
+              key={i}
+              className="skeleton animate-enter h-24 rounded-xl"
+              style={{ animationDelay: `${i * 60}ms` }}
+            />
           ))}
         </div>
       ) : categories.length === 0 ? (
-        <div className="text-muted-foreground bg-card rounded-xl border py-16 text-center">
+        <div className="text-muted-foreground bg-card animate-enter rounded-xl border py-16 text-center">
           <p className="font-medium">No categories yet</p>
           <p className="mt-1 text-sm">They are created automatically when you add a transaction.</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {categories.map((category) => {
+          {categories.map((category, index) => {
             const stat = totals.get(category.name);
             return (
               <div
                 key={category.id}
-                className="bg-card hover:border-foreground/20 rounded-xl border p-4 shadow-sm transition-colors"
+                style={{ animationDelay: `${Math.min(index, 12) * 45}ms` }}
+                className={cn(
+                  'bg-card animate-enter rounded-xl border p-4 shadow-sm',
+                  'transition-[transform,box-shadow,border-color] duration-200',
+                  'hover:border-foreground/20 hover:-translate-y-0.5 hover:shadow-md',
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
@@ -76,9 +86,11 @@ export default function CategoriesPage() {
                     <Badge>Both</Badge>
                   )}
                 </div>
-                <p className="mt-3 text-2xl font-semibold tabular-nums">
-                  {stat ? formatCurrency(stat.total) : formatCurrency(0)}
-                </p>
+                <AnimatedNumber
+                  value={stat ? stat.total : 0}
+                  format={(value) => formatCurrency(value)}
+                  className="mt-3 block text-2xl font-semibold"
+                />
                 <p className="text-muted-foreground mt-0.5 text-xs">
                   {stat ? `${stat.count} transaction${stat.count === 1 ? '' : 's'}` : 'No activity yet'}
                 </p>

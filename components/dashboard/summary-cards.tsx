@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowDownRight, ArrowUpRight, Receipt, Wallet } from 'lucide-react';
+import { AnimatedNumber } from '@/components/ui/animated-number';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn, formatCurrency } from '@/lib/utils';
 import type { WalletSummary } from '@/lib/types';
@@ -10,42 +11,61 @@ interface SummaryCardsProps {
   loading: boolean;
 }
 
+/** Cards arrive in sequence rather than all at once; short enough not to wait on. */
+const STAGGER_MS = 70;
+
 function StatCard({
   title,
   value,
+  format,
   hint,
   icon,
   valueClassName,
+  index,
 }: {
   title: string;
-  value: string;
+  value: number;
+  format: (value: number) => string;
   hint: string;
   icon: React.ReactNode;
   valueClassName?: string;
+  index: number;
 }) {
   return (
-    <Card>
+    <Card
+      className={cn(
+        'group animate-enter transition-[transform,box-shadow,border-color] duration-200',
+        'hover:border-foreground/15 hover:-translate-y-0.5 hover:shadow-md',
+      )}
+      style={{ animationDelay: `${index * STAGGER_MS}ms` }}
+    >
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <span className="text-muted-foreground">{icon}</span>
+        <span className="text-muted-foreground transition-[transform,color] duration-200 group-hover:scale-110 group-hover:text-foreground">
+          {icon}
+        </span>
       </CardHeader>
       <CardContent>
-        <div className={cn('text-2xl font-semibold tabular-nums tracking-tight', valueClassName)}>{value}</div>
+        <AnimatedNumber
+          value={value}
+          format={format}
+          className={cn('block text-2xl font-semibold tracking-tight', valueClassName)}
+        />
         <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
 }
 
-function SkeletonCard() {
+function SkeletonCard({ index }: { index: number }) {
   return (
-    <Card>
+    <Card className="animate-enter" style={{ animationDelay: `${index * STAGGER_MS}ms` }}>
       <CardHeader className="pb-2">
-        <div className="h-4 w-24 animate-pulse rounded bg-muted" />
+        <div className="skeleton h-4 w-24 rounded" />
       </CardHeader>
       <CardContent>
-        <div className="h-8 w-32 animate-pulse rounded bg-muted" />
-        <div className="mt-2 h-3 w-20 animate-pulse rounded bg-muted" />
+        <div className="skeleton h-8 w-32 rounded" />
+        <div className="skeleton mt-2 h-3 w-20 rounded" />
       </CardContent>
     </Card>
   );
@@ -56,7 +76,7 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[0, 1, 2, 3].map((i) => (
-          <SkeletonCard key={i} />
+          <SkeletonCard key={i} index={i} />
         ))}
       </div>
     );
@@ -68,32 +88,44 @@ export function SummaryCards({ summary, loading }: SummaryCardsProps) {
   const balanceTone = balance < 0 ? 'text-[var(--expense)]' : 'text-foreground';
   const savingsRate = totalIncome > 0 ? Math.round(((totalIncome - totalExpense) / totalIncome) * 100) : 0;
 
+  const money = (value: number) => formatCurrency(value, summary.currency);
+  // Counts pass through a fractional value mid-flight; only whole ones make sense.
+  const whole = (value: number) => String(Math.round(value));
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
+        index={0}
         title="Current balance"
-        value={formatCurrency(balance, summary.currency)}
+        value={balance}
+        format={money}
         hint={totalIncome > 0 ? `${savingsRate}% of income retained` : 'No income recorded yet'}
         icon={<Wallet className="h-4 w-4" />}
         valueClassName={balanceTone}
       />
       <StatCard
+        index={1}
         title="Total income"
-        value={formatCurrency(totalIncome, summary.currency)}
+        value={totalIncome}
+        format={money}
         hint={`${incomeCount} transaction${incomeCount === 1 ? '' : 's'}`}
         icon={<ArrowUpRight className="h-4 w-4" />}
         valueClassName="text-[var(--income)]"
       />
       <StatCard
+        index={2}
         title="Total expense"
-        value={formatCurrency(totalExpense, summary.currency)}
+        value={totalExpense}
+        format={money}
         hint={`${expenseCount} transaction${expenseCount === 1 ? '' : 's'}`}
         icon={<ArrowDownRight className="h-4 w-4" />}
         valueClassName="text-[var(--expense)]"
       />
       <StatCard
+        index={3}
         title="All transactions"
-        value={String(transactionCount)}
+        value={transactionCount}
+        format={whole}
         hint={summary.topCategories[0] ? `Top: ${summary.topCategories[0].category}` : 'No categories yet'}
         icon={<Receipt className="h-4 w-4" />}
       />

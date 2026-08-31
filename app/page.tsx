@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { AddTransactionDialog } from '@/components/dashboard/add-transaction-dialog';
 import { AskBar } from '@/components/dashboard/ask-bar';
 import { IncomeExpenseBar } from '@/components/dashboard/income-expense-bar';
+import { MonthlyBalance } from '@/components/dashboard/monthly-balance';
 import { SummaryCards } from '@/components/dashboard/summary-cards';
 import { TransactionTable } from '@/components/dashboard/transaction-table';
 import { AppShell } from '@/components/shell/app-shell';
@@ -99,20 +100,24 @@ export default function DashboardPage() {
             <IncomeExpenseBar summary={summary} />
           </div>
 
-          <div className="animate-enter min-w-0 space-y-3 lg:col-span-2" style={{ animationDelay: '260ms' }}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold tracking-tight">Recent activity</h2>
-              <Link
-                href="/transactions"
-                className="text-muted-foreground hover:text-foreground group text-xs transition-colors"
-              >
-                View all{' '}
-                <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
-                  →
-                </span>
-              </Link>
+          <div className="animate-enter min-w-0 space-y-6 lg:col-span-2" style={{ animationDelay: '260ms' }}>
+            <MonthlyBalance summary={summary} />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold tracking-tight">Recent activity</h2>
+                <Link
+                  href="/transactions"
+                  className="text-muted-foreground hover:text-foreground group text-xs transition-colors"
+                >
+                  View all{' '}
+                  <span className="inline-block transition-transform duration-200 group-hover:translate-x-0.5">
+                    →
+                  </span>
+                </Link>
+              </div>
+              <TransactionTable result={recent} loading={loading} onDelete={handleDelete} />
             </div>
-            <TransactionTable result={recent} loading={loading} onDelete={handleDelete} />
           </div>
         </div>
       </div>

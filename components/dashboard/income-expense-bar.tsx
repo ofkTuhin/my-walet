@@ -37,9 +37,11 @@ export function IncomeExpenseBar({ summary }: { summary: WalletSummary | null })
       <CardHeader>
         <CardTitle className="text-base">Income vs expense</CardTitle>
         <CardDescription>
+          {/* Deliberately not called a balance: this is the ledger alone, and
+              the balance card differs from it by whatever is lent or borrowed. */}
           {net >= 0
-            ? `You are up ${formatCurrency(net, currency)} overall.`
-            : `You are down ${formatCurrency(Math.abs(net), currency)} overall.`}
+            ? `Income exceeds spending by ${formatCurrency(net, currency)}.`
+            : `Spending exceeds income by ${formatCurrency(Math.abs(net), currency)}.`}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

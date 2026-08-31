@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowDownRight, ArrowUpRight, Receipt, Wallet } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, CreditCard, HandCoins, Receipt, Wallet } from 'lucide-react';
 import { AnimatedNumber } from '@/components/ui/animated-number';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -78,8 +78,8 @@ function SkeletonCard({ index, startDelay }: { index: number; startDelay: number
 export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsProps) {
   if (loading || !summary) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
           <SkeletonCard key={i} index={i} startDelay={startDelay} />
         ))}
       </div>
@@ -87,6 +87,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
   }
 
   const { balance, totalIncome, totalExpense, transactionCount, incomeCount, expenseCount } = summary;
+  const { receivable, payable, receivableCount, payableCount } = summary.debts;
 
   // A negative balance is a real state worth signalling, not just a minus sign.
   const balanceTone = balance < 0 ? 'text-[var(--expense)]' : 'text-foreground';
@@ -96,15 +97,26 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
   // Counts pass through a fractional value mid-flight; only whole ones make sense.
   const whole = (value: number) => String(Math.round(value));
 
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+  // The balance already nets debts off, so say so rather than leaving the
+  // figure looking like it disagrees with income minus expense.
+  const balanceHint =
+    receivable > 0 || payable > 0
+      ? `after ${money(receivable)} owed to you, ${money(payable)} owed by you`
+      : totalIncome > 0
+        ? `${savingsRate}% of income retained`
+        : 'No income recorded yet';
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <StatCard
         index={0}
         startDelay={startDelay}
         title="Current balance"
         value={balance}
         format={money}
-        hint={totalIncome > 0 ? `${savingsRate}% of income retained` : 'No income recorded yet'}
+        hint={balanceHint}
         icon={<Wallet className="h-4 w-4" />}
         valueClassName={balanceTone}
       />
@@ -130,6 +142,34 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
       />
       <StatCard
         index={3}
+        startDelay={startDelay}
+        title="Owed to you"
+        value={receivable}
+        format={money}
+        hint={
+          receivableCount > 0
+            ? `${plural(receivableCount, 'person', 'people')} still to repay you`
+            : 'Nobody owes you anything'
+        }
+        icon={<HandCoins className="h-4 w-4" />}
+        valueClassName={receivable > 0 ? 'text-[var(--income)]' : undefined}
+      />
+      <StatCard
+        index={4}
+        startDelay={startDelay}
+        title="You owe"
+        value={payable}
+        format={money}
+        hint={
+          payableCount > 0
+            ? `${plural(payableCount, 'debt', 'debts')} left to settle`
+            : 'You owe nothing'
+        }
+        icon={<CreditCard className="h-4 w-4" />}
+        valueClassName={payable > 0 ? 'text-[var(--expense)]' : undefined}
+      />
+      <StatCard
+        index={5}
         startDelay={startDelay}
         title="All transactions"
         value={transactionCount}

@@ -8,6 +8,7 @@ import {
   type CategoryDTO,
   type TransactionDTO,
 } from './serialize';
+import { getDebtTotals, type DebtTotals } from './debt-service';
 import type { AddTransactionInput, SearchTransactionsInput } from './validation';
 
 /**
@@ -18,8 +19,29 @@ import type { AddTransactionInput, SearchTransactionsInput } from './validation'
  * what a balance means.
  */
 
+/** One month of the ledger, with the balance carried in from the month before. */
+export interface MonthlyBucket {
+  /** `YYYY-MM`. */
+  month: string;
+  income: number;
+  expense: number;
+  /** income − expense for this month alone. */
+  net: number;
+  /** Closing balance of the previous month. */
+  openingBalance: number;
+  /** openingBalance + net — and the opening balance of the next month. */
+  closingBalance: number;
+}
+
 export interface WalletSummary {
+  /**
+   * Cash actually in hand: income − expense, less what you are owed and plus
+   * what you owe. Lending moves money out of the wallet even though it is not
+   * spending, so a balance that ignored debts would overstate what you have.
+   */
   balance: number;
+  /** income − expense alone, before any debt is taken into account. */
+  ledgerBalance: number;
   totalIncome: number;
   totalExpense: number;
   transactionCount: number;
@@ -29,6 +51,9 @@ export interface WalletSummary {
   period: { startDate: string | null; endDate: string | null };
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: TransactionDTO[];
+  debts: DebtTotals;
+  /** Oldest month first, each one opening where the last one closed. */
+  monthly: MonthlyBucket[];
 }
 
 export interface SearchResult {
@@ -80,6 +105,60 @@ async function resolveCategoryId(
   }
 }
 
+/**
+ * Income and expense per calendar month.
+ *
+ * Grouped in SQL rather than in JS: pulling every transaction back to bucket it
+ * would scale with the ledger, and this runs on every dashboard load.
+ *
+ * Months are cut in UTC, matching how dates are stored (anchored at 12:00 UTC),
+ * so a transaction never lands in a different month than the one it displays.
+ */
+async function monthlyTotals(
+  userId: string,
+  startDate?: Date,
+  endDate?: Date,
+): Promise<Array<{ month: string; income: number; expense: number }>> {
+  const rows = await prisma.$queryRaw<
+    Array<{ month: Date; income: Prisma.Decimal | null; expense: Prisma.Decimal | null }>
+  >`
+    SELECT date_trunc('month', t."date" AT TIME ZONE 'UTC') AS "month",
+           SUM(t."amount") FILTER (WHERE t."type" = 'INCOME')  AS "income",
+           SUM(t."amount") FILTER (WHERE t."type" = 'EXPENSE') AS "expense"
+      FROM public."transactions" t
+     WHERE t."userId" = ${userId}::text
+       AND (${startDate ?? null}::timestamp IS NULL OR t."date" >= ${startDate ?? null}::timestamp)
+       AND (${endDate ?? null}::timestamp IS NULL OR t."date" <= ${endDate ?? null}::timestamp)
+     GROUP BY 1
+     ORDER BY 1 ASC
+  `;
+
+  return rows.map((row) => ({
+    month: row.month.toISOString().slice(0, 7),
+    income: round2(decimalToNumber(row.income)),
+    expense: round2(decimalToNumber(row.expense)),
+  }));
+}
+
+/**
+ * Runs the opening/closing balance through the months.
+ *
+ * This is the "leftover carries over" rule stated directly: a month that earns
+ * more than it spends raises the balance it hands to the next month, and a
+ * month that overspends lowers it.
+ */
+function withCarryForward(
+  rows: Array<{ month: string; income: number; expense: number }>,
+): MonthlyBucket[] {
+  let running = 0;
+  return rows.map((row) => {
+    const net = round2(row.income - row.expense);
+    const openingBalance = running;
+    running = round2(openingBalance + net);
+    return { ...row, net, openingBalance, closingBalance: running };
+  });
+}
+
 export async function getWalletSummary(
   userId: string,
   options: {
@@ -91,7 +170,7 @@ export async function getWalletSummary(
   const dateFilter = dateRangeFilter(options.startDate, options.endDate);
   const where: Prisma.TransactionWhereInput = { userId, ...(dateFilter ? { date: dateFilter } : {}) };
 
-  const [totals, recent, categoryTotals] = await Promise.all([
+  const [totals, recent, categoryTotals, monthlyRows, debts] = await Promise.all([
     prisma.transaction.groupBy({
       by: ['type'],
       where,
@@ -113,6 +192,8 @@ export async function getWalletSummary(
       orderBy: { _sum: { amount: 'desc' } },
       take: 5,
     }),
+    monthlyTotals(userId, options.startDate, options.endDate),
+    getDebtTotals(userId),
   ]);
 
   const incomeRow = totals.find((row) => row.type === 'INCOME');
@@ -123,8 +204,11 @@ export async function getWalletSummary(
   const incomeCount = incomeRow?._count._all ?? 0;
   const expenseCount = expenseRow?._count._all ?? 0;
 
+  const ledgerBalance = round2(totalIncome - totalExpense);
+
   return {
-    balance: round2(totalIncome - totalExpense),
+    balance: round2(ledgerBalance + debts.netCashEffect),
+    ledgerBalance,
     totalIncome,
     totalExpense,
     transactionCount: incomeCount + expenseCount,
@@ -135,6 +219,8 @@ export async function getWalletSummary(
       startDate: options.startDate?.toISOString() ?? null,
       endDate: options.endDate?.toISOString() ?? null,
     },
+    debts,
+    monthly: withCarryForward(monthlyRows),
     topCategories: categoryTotals.map((row) => ({
       category: row.category,
       type: row.type,

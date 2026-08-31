@@ -18,6 +18,14 @@ enum TransactionType {
   EXPENSE
 }
 
+/// Which way an unsettled debt points.
+enum DebtDirection {
+  /// Money lent out: they owe you. Cash has left the wallet.
+  RECEIVABLE
+  /// Money borrowed: you owe them. Cash has entered the wallet.
+  PAYABLE
+}
+
 /// An account holder. `clerkId` is the external identity; every other table
 /// hangs off the local `id` so the app never depends on the auth vendor's
 /// identifiers reaching the database layer.
@@ -31,6 +39,7 @@ model User {
 
   transactions Transaction[]
   categories   Category[]
+  debts        Debt[]
 
   @@map("users")
 }
@@ -92,4 +101,53 @@ model Category {
   @@unique([userId, name])
   @@index([userId, type])
   @@map("categories")
+}
+
+/// Money lent to or borrowed from someone.
+///
+/// Deliberately not a Transaction: lending is not an expense, it converts cash
+/// into a claim. Keeping the two apart leaves income and expense totals
+/// meaning what they say, while the balance still reflects real cash — see
+/// getWalletSummary, which subtracts what you are owed and adds what you owe.
+model Debt {
+  id           String        @id @default(uuid())
+  direction    DebtDirection
+  /// The other party. A free-text name, not a linked account — this is a
+  /// personal wallet, and the counterparty is rarely a user of the system.
+  counterparty String
+  /// The original amount, never mutated. What remains is this minus the
+  /// repayments, so the history stays auditable rather than being overwritten.
+  principal    Decimal       @db.Decimal(12, 2)
+  note         String?
+  date         DateTime
+  /// Set when repayments have covered the principal. Denormalised so the
+  /// common "what is still outstanding" query does not have to aggregate.
+  settledAt    DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  repayments DebtRepayment[]
+
+  @@index([userId, direction, settledAt])
+  @@index([userId, date])
+  @@map("debts")
+}
+
+/// A part payment against a debt. Repaying in instalments is the normal case,
+/// so this is a ledger of its own rather than a flag on Debt.
+model DebtRepayment {
+  id        String   @id @default(uuid())
+  amount    Decimal  @db.Decimal(12, 2)
+  date      DateTime
+  note      String?
+  createdAt DateTime @default(now())
+
+  debtId String
+  debt   Debt   @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@index([debtId, date])
+  @@map("debt_repayments")
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { AskNotUnderstoodError, AskUnavailableError } from './ask-service';
 import { UnauthorizedError } from './current-user';
+import { DebtNotFoundError, RepaymentExceedsDebtError } from './debt-service';
 import { log } from './logger';
 import { formatZodError } from './validation';
 import { TransactionNotFoundError } from './wallet-service';
@@ -21,8 +22,12 @@ export function toErrorResponse(error: unknown): NextResponse {
   if (error instanceof UnauthorizedError) {
     return NextResponse.json({ error: error.message }, { status: 401 });
   }
-  if (error instanceof TransactionNotFoundError) {
+  if (error instanceof TransactionNotFoundError || error instanceof DebtNotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+  // Well-formed but not applicable to the debt's current state — 422, not 400.
+  if (error instanceof RepaymentExceedsDebtError) {
+    return NextResponse.json({ error: error.message }, { status: 422 });
   }
   if (error instanceof AskUnavailableError) {
     return NextResponse.json({ error: error.message }, { status: 501 });

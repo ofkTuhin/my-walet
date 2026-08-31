@@ -1,7 +1,7 @@
 'use client';
 
 import { UserButton } from '@clerk/nextjs';
-import { LayoutDashboard, ListOrdered, Menu, Settings, Tags, Wallet } from 'lucide-react';
+import { HandCoins, LayoutDashboard, ListOrdered, Menu, Settings, Tags, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 const NAV = [
   { href: '/', label: 'Dashboard', Icon: LayoutDashboard },
   { href: '/transactions', label: 'Transactions', Icon: ListOrdered },
+  { href: '/debts', label: 'Debts', Icon: HandCoins },
   { href: '/categories', label: 'Categories', Icon: Tags },
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];

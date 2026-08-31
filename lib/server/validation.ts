@@ -81,6 +81,37 @@ export const walletSummarySchema = z.object({
   endDate: flexibleDateSchema.optional(),
 });
 
+export const debtDirectionSchema = z.enum(['RECEIVABLE', 'PAYABLE']);
+
+export const addDebtSchema = z.object({
+  direction: debtDirectionSchema,
+  counterparty: z.string().trim().min(1, 'counterparty is required').max(120),
+  amount: z
+    .number()
+    .finite()
+    .positive('amount must be greater than 0 — use `direction` to indicate which way it points')
+    .max(9_999_999_999.99, 'amount exceeds the Decimal(12,2) column limit'),
+  note: z.string().trim().max(500).optional().nullable(),
+  date: flexibleDateSchema.optional(),
+});
+export type AddDebtInput = z.infer<typeof addDebtSchema>;
+
+export const addRepaymentSchema = z.object({
+  amount: z
+    .number()
+    .finite()
+    .positive('a repayment must be greater than 0')
+    .max(9_999_999_999.99, 'amount exceeds the Decimal(12,2) column limit'),
+  note: z.string().trim().max(500).optional().nullable(),
+  date: flexibleDateSchema.optional(),
+});
+export type AddRepaymentInput = z.infer<typeof addRepaymentSchema>;
+
+export const listDebtsSchema = z.object({
+  direction: debtDirectionSchema.optional(),
+  includeSettled: z.boolean().default(false),
+});
+
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1).max(64),
   type: transactionTypeSchema.optional().nullable(),

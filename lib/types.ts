@@ -21,8 +21,43 @@ export interface Category {
   createdAt: string;
 }
 
+export type DebtDirection = 'RECEIVABLE' | 'PAYABLE';
+
+export interface Debt {
+  id: string;
+  direction: DebtDirection;
+  counterparty: string;
+  principal: number;
+  outstanding: number;
+  repaid: number;
+  note: string | null;
+  date: string;
+  settledAt: string | null;
+  repayments: Array<{ id: string; amount: number; date: string; note: string | null }>;
+}
+
+export interface DebtTotals {
+  receivable: number;
+  payable: number;
+  receivableCount: number;
+  payableCount: number;
+  netCashEffect: number;
+}
+
+export interface MonthlyBucket {
+  month: string;
+  income: number;
+  expense: number;
+  net: number;
+  openingBalance: number;
+  closingBalance: number;
+}
+
 export interface WalletSummary {
+  /** Cash in hand: the ledger, less what you are owed, plus what you owe. */
   balance: number;
+  /** income − expense on its own, before debts. */
+  ledgerBalance: number;
   totalIncome: number;
   totalExpense: number;
   transactionCount: number;
@@ -32,6 +67,8 @@ export interface WalletSummary {
   period: { startDate: string | null; endDate: string | null };
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: Transaction[];
+  debts: DebtTotals;
+  monthly: MonthlyBucket[];
 }
 
 export interface SearchResult {

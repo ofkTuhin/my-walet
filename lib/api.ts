@@ -1,6 +1,8 @@
 import type {
   AskResponse,
   Category,
+  Debt,
+  DebtDirection,
   SearchResult,
   Transaction,
   TransactionFilters,
@@ -109,4 +111,30 @@ export const api = {
     request<{ deleted: boolean; transaction: Transaction }>(`/transactions/${id}`, {
       method: 'DELETE',
     }),
+
+  getDebts: (options: { direction?: DebtDirection; includeSettled?: boolean } = {}) => {
+    const query = new URLSearchParams();
+    if (options.direction) query.set('direction', options.direction);
+    if (options.includeSettled) query.set('includeSettled', 'true');
+    const suffix = query.toString();
+    return request<Debt[]>(`/debts${suffix ? `?${suffix}` : ''}`);
+  },
+
+  addDebt: (input: {
+    direction: DebtDirection;
+    counterparty: string;
+    amount: number;
+    note?: string;
+    date?: string;
+  }) => request<Debt>('/debts', { method: 'POST', body: JSON.stringify(input) }),
+
+  /** Returns the whole debt, so the caller sees the new outstanding amount. */
+  addRepayment: (debtId: string, input: { amount: number; note?: string; date?: string }) =>
+    request<Debt>(`/debts/${debtId}/repayments`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  deleteDebt: (id: string) =>
+    request<{ deleted: boolean; debt: Debt }>(`/debts/${id}`, { method: 'DELETE' }),
 };

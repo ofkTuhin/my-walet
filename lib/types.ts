@@ -65,6 +65,8 @@ export interface CurrentMonth extends MonthlyBucket {
 
 export interface AccountSettings {
   openingBalance: number;
+  /** `YYYY-MM` the balance is true at the start of; null = earliest month. */
+  openingBalanceMonth: string | null;
 }
 
 export interface WalletSummary {
@@ -82,8 +84,9 @@ export interface WalletSummary {
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: Transaction[];
   debts: DebtTotals;
-  /** Money held before anything was recorded here. */
+  /** The stated cash on hand at the start of `openingBalanceMonth`. */
   openingBalance: number;
+  openingBalanceMonth: string | null;
   monthly: MonthlyBucket[];
   currentMonth: CurrentMonth;
 }

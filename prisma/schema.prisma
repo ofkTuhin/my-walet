@@ -34,10 +34,15 @@ model User {
   clerkId   String   @unique
   email     String?
   name      String?
-  /// Money already held before anything was recorded here. Without it the
-  /// balance would start at zero for someone who did not open this account on
-  /// the day they were born.
+  /// Cash on hand at the start of `openingBalanceMonth`. Without it the balance
+  /// would start at zero for someone who did not open this account on the day
+  /// they were born.
   openingBalance Decimal @db.Decimal(12, 2) @default(0)
+  /// `YYYY-MM`: the month that balance is true at the start of. NULL means it
+  /// applies from the earliest month on record. Storing the month rather than
+  /// "last month" matters — the latter would quietly mean a different month
+  /// every time the calendar turned over.
+  openingBalanceMonth String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

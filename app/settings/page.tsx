@@ -27,15 +27,36 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
   );
 }
 
+/** `YYYY-MM` for a month offset from the current one. */
+function monthKey(offset = 0): string {
+  const now = new Date();
+  const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offset, 1));
+  return date.toISOString().slice(0, 7);
+}
+
+function monthName(key: string): string {
+  return new Date(`${key}-15T12:00:00Z`).toLocaleDateString('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
 /**
- * Money already held before this wallet recorded anything.
+ * The balance you already had, and the month it was true at the start of.
  *
- * Everything else is derived from transactions, which start at zero — this is
+ * Everything else is derived from transactions, which begin at zero — this is
  * the one figure that has to be told to the app rather than calculated.
+ *
+ * The month is stored rather than a bare "last month", because a bare one would
+ * quietly mean a different month every time the calendar turned over. It
+ * defaults to the start of this month, which is the same thing as what last
+ * month closed on.
  */
 function OpeningBalanceRow() {
   const [value, setValue] = useState('');
-  const [saved, setSaved] = useState<number | null>(null);
+  const [month, setMonth] = useState(monthKey());
+  const [saved, setSaved] = useState<{ balance: number; month: string } | null>(null);
   const [status, setStatus] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [message, setMessage] = useState<string | null>(null);
 
@@ -43,8 +64,10 @@ function OpeningBalanceRow() {
     api
       .getAccount()
       .then((account) => {
-        setSaved(account.openingBalance);
+        const withMonth = account.openingBalanceMonth ?? monthKey();
+        setSaved({ balance: account.openingBalance, month: withMonth });
         setValue(String(account.openingBalance));
+        setMonth(withMonth);
       })
       .catch(() => undefined);
   }, []);
@@ -59,42 +82,53 @@ function OpeningBalanceRow() {
     setStatus('saving');
     setMessage(null);
     try {
-      const account = await api.setOpeningBalance(amount);
-      setSaved(account.openingBalance);
+      const account = await api.setOpeningBalance(amount, month);
+      const withMonth = account.openingBalanceMonth ?? monthKey();
+      setSaved({ balance: account.openingBalance, month: withMonth });
       setValue(String(account.openingBalance));
+      setMonth(withMonth);
       setStatus('done');
-      setMessage('Saved. Your balance and every month now start from this.');
+      setMessage(`Saved. ${monthName(withMonth)} now starts from this, and earlier months are worked back from it.`);
     } catch (err) {
       setStatus('error');
       setMessage(err instanceof Error ? err.message : 'Could not save that.');
     }
   }
 
-  const dirty = saved !== null && Number(value) !== saved;
+  const dirty = saved !== null && (Number(value) !== saved.balance || month !== saved.month);
 
   return (
     <div className="border-b px-5 py-4 last:border-0">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium">Starting balance</p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium">Balance you started with</p>
           <p className="text-muted-foreground mt-0.5 text-xs">
-            What you already had before recording anything here.
+            What you had in hand at the start of the month you pick — which is the same as
+            what the month before it closed on.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             type="number"
             step="0.01"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            aria-label="Starting balance"
-            className="h-9 w-36 text-right"
+            aria-label="Balance you started with"
+            className="h-9 w-32 text-right"
+          />
+          <Input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            aria-label="Month this balance is true at the start of"
+            className="h-9 w-40"
           />
           <Button size="sm" onClick={() => void save()} disabled={status === 'saving' || !dirty}>
             {status === 'saving' ? 'Saving…' : 'Save'}
           </Button>
         </div>
       </div>
+
       {message ? (
         <p
           className={`mt-2 text-xs ${status === 'error' ? 'text-[var(--expense)]' : 'text-[var(--income)]'}`}
@@ -103,8 +137,19 @@ function OpeningBalanceRow() {
         </p>
       ) : saved !== null && !dirty ? (
         <p className="text-muted-foreground mt-2 text-xs">
-          Currently {formatCurrency(saved)}.
+          {formatCurrency(saved.balance)} at the start of {monthName(saved.month)}.
         </p>
+      ) : null}
+
+      {/* One tap for the case the whole control exists to serve. */}
+      {month !== monthKey() ? (
+        <button
+          type="button"
+          onClick={() => setMonth(monthKey())}
+          className="text-muted-foreground hover:text-foreground mt-2 text-xs underline underline-offset-2"
+        >
+          Use the start of this month instead
+        </button>
       ) : null}
     </div>
   );

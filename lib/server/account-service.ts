@@ -14,14 +14,19 @@ import type { UpdateAccountInput } from './validation';
 
 export interface AccountSettings {
   openingBalance: number;
+  /** `YYYY-MM` the balance is true at the start of; null = earliest month. */
+  openingBalanceMonth: string | null;
 }
 
 export async function getAccountSettings(userId: string): Promise<AccountSettings> {
   const account = await prisma.user.findUnique({
     where: { id: userId },
-    select: { openingBalance: true },
+    select: { openingBalance: true, openingBalanceMonth: true },
   });
-  return { openingBalance: round2(decimalToNumber(account?.openingBalance ?? null)) };
+  return {
+    openingBalance: round2(decimalToNumber(account?.openingBalance ?? null)),
+    openingBalanceMonth: account?.openingBalanceMonth ?? null,
+  };
 }
 
 export async function updateAccountSettings(
@@ -34,8 +39,15 @@ export async function updateAccountSettings(
       // From a string, so no binary float error already in the number is
       // carried into the Decimal column.
       openingBalance: new Prisma.Decimal(input.openingBalance.toFixed(2)),
+      // Absent leaves the anchor alone; an explicit null clears it.
+      ...(input.openingBalanceMonth !== undefined
+        ? { openingBalanceMonth: input.openingBalanceMonth }
+        : {}),
     },
-    select: { openingBalance: true },
+    select: { openingBalance: true, openingBalanceMonth: true },
   });
-  return { openingBalance: round2(decimalToNumber(updated.openingBalance)) };
+  return {
+    openingBalance: round2(decimalToNumber(updated.openingBalance)),
+    openingBalanceMonth: updated.openingBalanceMonth,
+  };
 }

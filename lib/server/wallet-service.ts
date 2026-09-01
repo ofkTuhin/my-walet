@@ -71,8 +71,10 @@ export interface WalletSummary {
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: TransactionDTO[];
   debts: DebtTotals;
-  /** Money held before anything was recorded here; seeds the first month. */
+  /** The stated cash on hand at the start of `openingBalanceMonth`. */
   openingBalance: number;
+  /** `YYYY-MM` the stated balance is true at the start of; null = earliest month. */
+  openingBalanceMonth: string | null;
   /** Oldest month first, each one opening where the last one closed. */
   monthly: MonthlyBucket[];
   currentMonth: CurrentMonth;
@@ -210,28 +212,66 @@ async function monthlyDebtFlow(
  * more than it spends raises the balance it hands to the next month, and a
  * month that overspends lowers it. Lending and repayment ride along in
  * `debtFlow`, which moves cash without being income or spending.
+ *
+ * The stated balance anchors one month, and the chain is solved outwards from
+ * there: forwards by adding each month's flow, backwards by subtracting it. So
+ * telling the app what you had at the start of September also fills in what
+ * August must have closed on, instead of leaving earlier months stranded.
  */
 function withCarryForward(
   ledger: Array<{ month: string; income: number; expense: number }>,
   debtFlow: Map<string, number>,
   openingBalance: number,
+  anchorMonth: string | null,
 ): MonthlyBucket[] {
   // A month may have debt movement and no transactions at all, so the set of
   // months is the union of both sources, not just the ledger's.
   const months = [...new Set([...ledger.map((r) => r.month), ...debtFlow.keys()])].sort();
   const byMonth = new Map(ledger.map((row) => [row.month, row]));
 
-  let running = openingBalance;
-  return months.map((month) => {
+  const rows = months.map((month) => {
     const row = byMonth.get(month);
     const income = row?.income ?? 0;
     const expense = row?.expense ?? 0;
-    const net = round2(income - expense);
-    const flow = debtFlow.get(month) ?? 0;
-    const opening = running;
-    running = round2(opening + net + flow);
-    return { month, income, expense, net, debtFlow: flow, openingBalance: opening, closingBalance: running };
+    return {
+      month,
+      income,
+      expense,
+      net: round2(income - expense),
+      debtFlow: debtFlow.get(month) ?? 0,
+    };
   });
+
+  // The anchor lands on the first month at or after the stated one. With no
+  // anchor it is the earliest month, which is the behaviour without a stated
+  // balance. An anchor past every recorded month lands one beyond the end,
+  // leaving the whole chain to be solved backwards from it.
+  const found = anchorMonth ? rows.findIndex((row) => row.month >= anchorMonth) : 0;
+  const anchorIndex = anchorMonth ? (found === -1 ? rows.length : found) : 0;
+
+  const opening = new Array<number>(rows.length);
+  const closing = new Array<number>(rows.length);
+
+  let forward = openingBalance;
+  for (let i = anchorIndex; i < rows.length; i++) {
+    opening[i] = forward;
+    forward = round2(forward + rows[i]!.net + rows[i]!.debtFlow);
+    closing[i] = forward;
+  }
+
+  // Each earlier month closes exactly where the next one opens.
+  let backward = openingBalance;
+  for (let i = anchorIndex - 1; i >= 0; i--) {
+    closing[i] = backward;
+    backward = round2(backward - rows[i]!.net - rows[i]!.debtFlow);
+    opening[i] = backward;
+  }
+
+  return rows.map((row, i) => ({
+    ...row,
+    openingBalance: opening[i]!,
+    closingBalance: closing[i]!,
+  }));
 }
 
 /**
@@ -301,7 +341,10 @@ export async function getWalletSummary(
     monthlyTotals(userId, options.startDate, options.endDate),
     getDebtTotals(userId),
     monthlyDebtFlow(userId, options.startDate, options.endDate),
-    prisma.user.findUnique({ where: { id: userId }, select: { openingBalance: true } }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { openingBalance: true, openingBalanceMonth: true },
+    }),
   ]);
 
   const incomeRow = totals.find((row) => row.type === 'INCOME');
@@ -314,14 +357,16 @@ export async function getWalletSummary(
 
   const ledgerBalance = round2(totalIncome - totalExpense);
   const openingBalance = round2(decimalToNumber(account?.openingBalance ?? null));
-  const monthly = withCarryForward(monthlyRows, debtFlow, openingBalance);
+  const openingBalanceMonth = account?.openingBalanceMonth ?? null;
+  const monthly = withCarryForward(monthlyRows, debtFlow, openingBalance, openingBalanceMonth);
 
   return {
-    // The opening balance is money already held, so it sits underneath
-    // everything the ledger and the debts do.
-    balance: round2(openingBalance + ledgerBalance + debts.netCashEffect),
+    // Taken from the chain rather than recomputed, so the balance and the last
+    // row of the monthly table can never drift apart. With no stated month this
+    // is identical to openingBalance + ledger + debts; with one, it correctly
+    // ignores months already baked into the stated figure.
+    balance: monthly.at(-1)?.closingBalance ?? openingBalance,
     ledgerBalance,
-    openingBalance,
     totalIncome,
     totalExpense,
     transactionCount: incomeCount + expenseCount,
@@ -333,6 +378,8 @@ export async function getWalletSummary(
       endDate: options.endDate?.toISOString() ?? null,
     },
     debts,
+    openingBalance,
+    openingBalanceMonth,
     monthly,
     currentMonth: buildCurrentMonth(monthly, openingBalance),
     topCategories: categoryTotals.map((row) => ({

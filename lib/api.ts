@@ -141,9 +141,10 @@ export const api = {
 
   getAccount: () => request<AccountSettings>('/account'),
 
-  setOpeningBalance: (openingBalance: number) =>
+  /** `openingBalanceMonth` is the month the figure is true at the start of. */
+  setOpeningBalance: (openingBalance: number, openingBalanceMonth: string | null) =>
     request<AccountSettings>('/account', {
       method: 'PATCH',
-      body: JSON.stringify({ openingBalance }),
+      body: JSON.stringify({ openingBalance, openingBalanceMonth }),
     }),
 };

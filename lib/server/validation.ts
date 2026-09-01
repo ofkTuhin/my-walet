@@ -119,6 +119,13 @@ export const updateAccountSchema = z.object({
     .finite()
     .min(-9_999_999_999.99, 'openingBalance exceeds the Decimal(12,2) column limit')
     .max(9_999_999_999.99, 'openingBalance exceeds the Decimal(12,2) column limit'),
+  /// `YYYY-MM`. Null clears the anchor, applying the balance from the earliest
+  /// month on record.
+  openingBalanceMonth: z
+    .string()
+    .regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'openingBalanceMonth must be YYYY-MM')
+    .nullable()
+    .optional(),
 });
 export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
 

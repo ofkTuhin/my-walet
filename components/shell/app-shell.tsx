@@ -1,19 +1,20 @@
 'use client';
 
 import { UserButton } from '@clerk/nextjs';
-import { HandCoins, LayoutDashboard, ListOrdered, Menu, Settings, Tags, Wallet } from 'lucide-react';
+import { HandCoins, LayoutDashboard, ListOrdered, Settings, Tags, Wallet } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
 
 import { ThemeToggle } from '@/components/theme-toggle';
 import { cn } from '@/lib/utils';
 
 /**
- * The application chrome: a persistent sidebar, a topbar, and the page slot.
+ * The application chrome: a sidebar on desktop, a bottom tab bar on phones,
+ * and the page slot between them.
  *
- * The sidebar is fixed on desktop and a slide-over on small screens — the
- * navigation should not consume a third of a phone viewport.
+ * Phones get tabs rather than a drawer because the destinations are few and
+ * fixed. A drawer hides them behind a tap and puts them at the top of a screen
+ * that is held at the bottom; tabs are always visible and within thumb reach.
  */
 
 const NAV = [
@@ -24,22 +25,22 @@ const NAV = [
   { href: '/settings', label: 'Settings', Icon: Settings },
 ];
 
-/** How long the drawer takes to slide; the unmount is delayed to match. */
-const DRAWER_MS = 260;
+/** Only "/" needs an exact match; every other route owns its subtree. */
+function isActive(href: string, pathname: string): boolean {
+  return href === '/' ? pathname === '/' : pathname.startsWith(href);
+}
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarLinks() {
   const pathname = usePathname();
 
   return (
     <nav className="flex flex-col gap-1 p-3">
       {NAV.map(({ href, label, Icon }) => {
-        // Only "/" needs an exact match; every other route owns its subtree.
-        const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+        const active = isActive(href, pathname);
         return (
           <Link
             key={href}
             href={href}
-            onClick={onNavigate}
             aria-current={active ? 'page' : undefined}
             className={cn(
               'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium',
@@ -74,6 +75,55 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function BottomNav() {
+  const pathname = usePathname();
+
+  return (
+    <nav
+      aria-label="Main"
+      className={cn(
+        'bg-background/95 fixed inset-x-0 bottom-0 z-40 border-t backdrop-blur lg:hidden',
+        'grid grid-cols-5',
+      )}
+      // The home indicator on a full-screen iOS install sits over this bar, so
+      // the row is lifted clear of it rather than being tapped through.
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      {NAV.map(({ href, label, Icon }) => {
+        const active = isActive(href, pathname);
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-current={active ? 'page' : undefined}
+            className={cn(
+              'relative flex min-w-0 flex-col items-center justify-center gap-1 px-1 py-2',
+              'transition-colors duration-200 active:scale-95',
+              'focus-visible:ring-ring focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset',
+              active ? 'text-primary' : 'text-muted-foreground',
+            )}
+          >
+            {/* Sits on the border itself, so the active tab reads as attached
+                to the bar rather than floating inside it. */}
+            <span
+              aria-hidden
+              className={cn(
+                'bg-primary absolute top-0 h-0.5 w-8 rounded-b-full',
+                'origin-center transition-transform duration-300 ease-out-quart',
+                active ? 'scale-x-100' : 'scale-x-0',
+              )}
+            />
+            <Icon className={cn('h-5 w-5 shrink-0 transition-transform duration-200', active && 'scale-110')} />
+            <span className="w-full truncate text-center text-[10px] leading-none font-medium">
+              {label}
+            </span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
 function Brand() {
   return (
     <div className="flex h-14 items-center gap-2 border-b px-5">
@@ -90,84 +140,24 @@ export function AppShell({ title, actions, children }: {
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  // Two flags, because an element cannot animate out after it has unmounted:
-  // `mounted` keeps it in the DOM, `open` drives the transition.
-  const [mounted, setMounted] = useState(false);
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
-
-  function openDrawer() {
-    setMounted(true);
-    // Next frame, so the browser has an "off-screen" style to animate away from.
-    requestAnimationFrame(() => setOpen(true));
-  }
-
-  const closeDrawer = useCallback(() => {
-    setOpen(false);
-    setTimeout(() => setMounted(false), DRAWER_MS);
-  }, []);
-
-  // Escape closes the drawer, and the page behind it stops scrolling while
-  // it is open — a panel you can scroll out from under is disorienting.
-  useEffect(() => {
-    if (!mounted) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeDrawer();
-    };
-    document.addEventListener('keydown', onKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [mounted, closeDrawer]);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
-      {/* Desktop sidebar */}
       <aside className="bg-card hidden border-r lg:block">
         <div className="sticky top-0">
           <Brand />
-          <NavLinks />
+          <SidebarLinks />
         </div>
       </aside>
 
-      {/* Mobile slide-over */}
-      {mounted && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            aria-label="Close navigation"
-            onClick={closeDrawer}
-            className={cn(
-              'absolute inset-0 bg-black/50 backdrop-blur-[2px] transition-opacity duration-200',
-              open ? 'opacity-100' : 'opacity-0',
-            )}
-          />
-          <aside
-            className={cn(
-              'bg-card absolute inset-y-0 left-0 w-64 border-r shadow-xl',
-              'transition-transform duration-[260ms] ease-out-quart',
-              open ? 'translate-x-0' : '-translate-x-full',
-            )}
-          >
-            <Brand />
-            <NavLinks onNavigate={closeDrawer} />
-          </aside>
-        </div>
-      )}
-
       <div className="flex min-w-0 flex-col">
         <header className="bg-background/80 sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4 backdrop-blur sm:px-6">
-          <button
-            type="button"
-            aria-label="Open navigation"
-            aria-expanded={open}
-            onClick={openDrawer}
-            className="hover:bg-accent -ml-1 rounded-md p-2 transition-[background-color,transform] duration-200 active:scale-90 lg:hidden"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
+          {/* The sidebar carries the brand on desktop; without it, a phone would
+              otherwise show no mark at all. */}
+          <div className="bg-primary text-primary-foreground flex h-7 w-7 shrink-0 items-center justify-center rounded-md lg:hidden">
+            <Wallet className="h-4 w-4" />
+          </div>
 
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight sm:text-base">
             {title}
@@ -181,11 +171,18 @@ export function AppShell({ title, actions, children }: {
         </header>
 
         {/* Keyed on the route so navigating replays the entrance: the content
-            swap is otherwise instantaneous and easy to miss. */}
-        <main key={pathname} className="animate-enter min-w-0 flex-1 p-4 sm:p-6">
+            swap is otherwise instantaneous and easy to miss.
+            The bottom padding clears the tab bar, which is fixed and would
+            otherwise cover the last row of a table. */}
+        <main
+          key={pathname}
+          className="animate-enter min-w-0 flex-1 p-4 pb-[calc(4.75rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(5rem+env(safe-area-inset-bottom))] lg:pb-6"
+        >
           {children}
         </main>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
-import { ArrowDownRight, ArrowUpRight, CreditCard, HandCoins, Receipt, Wallet } from 'lucide-react';
+import {
+  ArrowDownRight, ArrowUpRight, CalendarClock, CreditCard, HandCoins, Receipt, Wallet,
+} from 'lucide-react';
 import { AnimatedNumber } from '@/components/ui/animated-number';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn, formatCurrency } from '@/lib/utils';
@@ -78,8 +80,8 @@ function SkeletonCard({ index, startDelay }: { index: number; startDelay: number
 export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsProps) {
   if (loading || !summary) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[0, 1, 2, 3, 4, 5].map((i) => (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <SkeletonCard key={i} index={i} startDelay={startDelay} />
         ))}
       </div>
@@ -88,6 +90,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
 
   const { balance, totalIncome, totalExpense, transactionCount, incomeCount, expenseCount } = summary;
   const { receivable, payable, receivableCount, payableCount } = summary.debts;
+  const { currentMonth } = summary;
 
   // A negative balance is a real state worth signalling, not just a minus sign.
   const balanceTone = balance < 0 ? 'text-[var(--expense)]' : 'text-foreground';
@@ -97,19 +100,48 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
   // Counts pass through a fractional value mid-flight; only whole ones make sense.
   const whole = (value: number) => String(Math.round(value));
 
+  const monthLabel = new Date(`${currentMonth.month}-15T12:00:00Z`).toLocaleDateString('en-US', {
+    month: 'long',
+    timeZone: 'UTC',
+  });
+
+  // Comparing this month's leftover with last month's says more than either
+  // number alone: it answers "am I doing better or worse than last month".
+  const delta = currentMonth.deltaVsPrevious;
+  const monthHasActivity = currentMonth.income > 0 || currentMonth.expense > 0;
+  const comparison =
+    delta === null
+      ? `${monthLabel} is the first month on record`
+      : // On the 1st of a month the whole of last month's surplus reads as a
+        // shortfall, which is arithmetically true and completely useless.
+        !monthHasActivity
+        ? `Nothing recorded in ${monthLabel} yet`
+        : delta === 0
+          ? 'Exactly level with last month'
+          : delta > 0
+            ? `${money(delta)} better than last month`
+            : `${money(Math.abs(delta))} worse than last month`;
+
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
   // The balance already nets debts off, so say so rather than leaving the
   // figure looking like it disagrees with income minus expense.
+  // Only the sides that actually have something on them: "$0.00 owed by you"
+  // is noise dressed up as information.
+  const debtNotes = [
+    receivable > 0 ? `${money(receivable)} lent out` : null,
+    payable > 0 ? `${money(payable)} borrowed` : null,
+  ].filter(Boolean);
+
   const balanceHint =
-    receivable > 0 || payable > 0
-      ? `after ${money(receivable)} owed to you, ${money(payable)} owed by you`
+    debtNotes.length > 0
+      ? `after ${debtNotes.join(' and ')}`
       : totalIncome > 0
         ? `${savingsRate}% of income retained`
         : 'No income recorded yet';
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatCard
         index={0}
         startDelay={startDelay}
@@ -123,6 +155,15 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
       <StatCard
         index={1}
         startDelay={startDelay}
+        title={`Balance on 1 ${monthLabel}`}
+        value={currentMonth.openingBalance}
+        format={money}
+        hint={comparison}
+        icon={<CalendarClock className="h-4 w-4" />}
+      />
+      <StatCard
+        index={2}
+        startDelay={startDelay}
         title="Total income"
         value={totalIncome}
         format={money}
@@ -131,7 +172,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
         valueClassName="text-[var(--income)]"
       />
       <StatCard
-        index={2}
+        index={3}
         startDelay={startDelay}
         title="Total expense"
         value={totalExpense}
@@ -141,7 +182,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
         valueClassName="text-[var(--expense)]"
       />
       <StatCard
-        index={3}
+        index={4}
         startDelay={startDelay}
         title="Owed to you"
         value={receivable}
@@ -155,7 +196,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
         valueClassName={receivable > 0 ? 'text-[var(--income)]' : undefined}
       />
       <StatCard
-        index={4}
+        index={5}
         startDelay={startDelay}
         title="You owe"
         value={payable}
@@ -169,7 +210,7 @@ export function SummaryCards({ summary, loading, startDelay = 0 }: SummaryCardsP
         valueClassName={payable > 0 ? 'text-[var(--expense)]' : undefined}
       />
       <StatCard
-        index={5}
+        index={6}
         startDelay={startDelay}
         title="All transactions"
         value={transactionCount}

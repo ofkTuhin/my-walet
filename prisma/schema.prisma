@@ -34,6 +34,10 @@ model User {
   clerkId   String   @unique
   email     String?
   name      String?
+  /// Money already held before anything was recorded here. Without it the
+  /// balance would start at zero for someone who did not open this account on
+  /// the day they were born.
+  openingBalance Decimal @db.Decimal(12, 2) @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

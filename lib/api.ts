@@ -1,4 +1,5 @@
 import type {
+  AccountSettings,
   AskResponse,
   Category,
   Debt,
@@ -137,4 +138,12 @@ export const api = {
 
   deleteDebt: (id: string) =>
     request<{ deleted: boolean; debt: Debt }>(`/debts/${id}`, { method: 'DELETE' }),
+
+  getAccount: () => request<AccountSettings>('/account'),
+
+  setOpeningBalance: (openingBalance: number) =>
+    request<AccountSettings>('/account', {
+      method: 'PATCH',
+      body: JSON.stringify({ openingBalance }),
+    }),
 };

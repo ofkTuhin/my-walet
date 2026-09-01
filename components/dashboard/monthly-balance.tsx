@@ -23,7 +23,14 @@ function monthLabel(month: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
-function Row({ bucket, index, currency }: { bucket: MonthlyBucket; index: number; currency: string }) {
+function Row({
+  bucket, index, currency, showDebts,
+}: {
+  bucket: MonthlyBucket;
+  index: number;
+  currency: string;
+  showDebts: boolean;
+}) {
   const positive = bucket.net >= 0;
 
   return (
@@ -54,6 +61,18 @@ function Row({ bucket, index, currency }: { bucket: MonthlyBucket; index: number
           {formatCurrency(bucket.income, currency)} in · {formatCurrency(bucket.expense, currency)} out
         </span>
       </td>
+      {showDebts ? (
+        <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">
+          {bucket.debtFlow === 0 ? (
+            <span className="text-muted-foreground">—</span>
+          ) : (
+            <span className={bucket.debtFlow > 0 ? 'text-[var(--income)]' : 'text-[var(--expense)]'}>
+              {bucket.debtFlow > 0 ? '+' : '−'}
+              {formatCurrency(Math.abs(bucket.debtFlow), currency)}
+            </span>
+          )}
+        </td>
+      ) : null}
       <td className="px-3 py-3 text-right font-semibold tabular-nums sm:px-4">
         {formatCurrency(bucket.closingBalance, currency)}
       </td>
@@ -65,6 +84,8 @@ export function MonthlyBalance({ summary }: { summary: WalletSummary | null }) {
   if (!summary) return null;
 
   const { monthly, currency } = summary;
+  // The column only earns its place once something has been lent or borrowed.
+  const showDebts = monthly.some((bucket) => bucket.debtFlow !== 0);
 
   return (
     <Card>
@@ -72,7 +93,7 @@ export function MonthlyBalance({ summary }: { summary: WalletSummary | null }) {
         <CardTitle className="text-base">Month by month</CardTitle>
         <CardDescription>
           What each month left over, carried into the next. A month that spends more than it
-          earns takes the balance back down.
+          earns takes the balance back down. The last row closes on your current balance.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
@@ -89,12 +110,21 @@ export function MonthlyBalance({ summary }: { summary: WalletSummary | null }) {
                   <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">In</th>
                   <th className="hidden px-4 py-2 text-right font-medium sm:table-cell">Out</th>
                   <th className="px-3 py-2 text-right font-medium sm:px-4">Left over</th>
+                  {showDebts ? (
+                    <th className="hidden px-4 py-2 text-right font-medium md:table-cell">Lent/borrowed</th>
+                  ) : null}
                   <th className="px-3 py-2 text-right font-medium sm:px-4">Balance</th>
                 </tr>
               </thead>
               <tbody>
                 {monthly.map((bucket, index) => (
-                  <Row key={bucket.month} bucket={bucket} index={index} currency={currency} />
+                  <Row
+                    key={bucket.month}
+                    bucket={bucket}
+                    index={index}
+                    currency={currency}
+                    showDebts={showDebts}
+                  />
                 ))}
               </tbody>
             </table>

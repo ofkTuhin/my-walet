@@ -112,6 +112,16 @@ export const listDebtsSchema = z.object({
   includeSettled: z.boolean().default(false),
 });
 
+export const updateAccountSchema = z.object({
+  /// Negative is allowed on purpose: an account can legitimately start overdrawn.
+  openingBalance: z
+    .number()
+    .finite()
+    .min(-9_999_999_999.99, 'openingBalance exceeds the Decimal(12,2) column limit')
+    .max(9_999_999_999.99, 'openingBalance exceeds the Decimal(12,2) column limit'),
+});
+export type UpdateAccountInput = z.infer<typeof updateAccountSchema>;
+
 export const createCategorySchema = z.object({
   name: z.string().trim().min(1).max(64),
   type: transactionTypeSchema.optional().nullable(),

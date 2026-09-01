@@ -25,12 +25,31 @@ export interface MonthlyBucket {
   month: string;
   income: number;
   expense: number;
-  /** income − expense for this month alone. */
+  /** income − expense for this month alone: what the month left over. */
   net: number;
-  /** Closing balance of the previous month. */
+  /**
+   * Cash moved by lending and repayment this month, signed. Lending out and
+   * repaying a loan are negative; borrowing and being repaid are positive.
+   * Separate from `net` because neither is income or spending.
+   */
+  debtFlow: number;
+  /** Closing balance of the previous month — what this month started with. */
   openingBalance: number;
-  /** openingBalance + net — and the opening balance of the next month. */
+  /** openingBalance + net + debtFlow, and the next month's opening balance. */
   closingBalance: number;
+}
+
+/**
+ * The month in progress, and how it compares with the one before.
+ *
+ * Always present even when the month has no activity yet, so the dashboard can
+ * state what the month opened with rather than showing nothing.
+ */
+export interface CurrentMonth extends MonthlyBucket {
+  /** Last month's net, or null when there is no earlier month on record. */
+  previousNet: number | null;
+  /** thisMonth.net − previousNet. Null for the same reason. */
+  deltaVsPrevious: number | null;
 }
 
 export interface WalletSummary {
@@ -52,8 +71,11 @@ export interface WalletSummary {
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: TransactionDTO[];
   debts: DebtTotals;
+  /** Money held before anything was recorded here; seeds the first month. */
+  openingBalance: number;
   /** Oldest month first, each one opening where the last one closed. */
   monthly: MonthlyBucket[];
+  currentMonth: CurrentMonth;
 }
 
 export interface SearchResult {
@@ -105,6 +127,11 @@ async function resolveCategoryId(
   }
 }
 
+/** `YYYY-MM` for a date, cut in UTC to match how dates are stored. */
+function monthKey(date: Date): string {
+  return date.toISOString().slice(0, 7);
+}
+
 /**
  * Income and expense per calendar month.
  *
@@ -134,10 +161,46 @@ async function monthlyTotals(
   `;
 
   return rows.map((row) => ({
-    month: row.month.toISOString().slice(0, 7),
+    month: monthKey(row.month),
     income: round2(decimalToNumber(row.income)),
     expense: round2(decimalToNumber(row.expense)),
   }));
+}
+
+/**
+ * Cash moved by debts per calendar month.
+ *
+ * Lending out and repaying what you borrowed take cash out; borrowing and being
+ * repaid put it back. Summing these alongside income and expense is what makes
+ * the last month's closing balance equal the balance on the summary card —
+ * without it the two would disagree by whatever is currently outstanding.
+ */
+async function monthlyDebtFlow(
+  userId: string,
+  startDate?: Date,
+  endDate?: Date,
+): Promise<Map<string, number>> {
+  const rows = await prisma.$queryRaw<Array<{ month: Date; flow: Prisma.Decimal | null }>>`
+    SELECT "month", SUM("flow") AS "flow" FROM (
+      SELECT date_trunc('month', d."date" AT TIME ZONE 'UTC') AS "month",
+             CASE WHEN d."direction" = 'RECEIVABLE' THEN -d."principal" ELSE d."principal" END AS "flow"
+        FROM public."debts" d
+       WHERE d."userId" = ${userId}::text
+         AND (${startDate ?? null}::timestamp IS NULL OR d."date" >= ${startDate ?? null}::timestamp)
+         AND (${endDate ?? null}::timestamp IS NULL OR d."date" <= ${endDate ?? null}::timestamp)
+      UNION ALL
+      SELECT date_trunc('month', r."date" AT TIME ZONE 'UTC') AS "month",
+             CASE WHEN d."direction" = 'RECEIVABLE' THEN r."amount" ELSE -r."amount" END AS "flow"
+        FROM public."debt_repayments" r
+        JOIN public."debts" d ON d."id" = r."debtId"
+       WHERE d."userId" = ${userId}::text
+         AND (${startDate ?? null}::timestamp IS NULL OR r."date" >= ${startDate ?? null}::timestamp)
+         AND (${endDate ?? null}::timestamp IS NULL OR r."date" <= ${endDate ?? null}::timestamp)
+    ) x
+    GROUP BY "month"
+  `;
+
+  return new Map(rows.map((row) => [monthKey(row.month), round2(decimalToNumber(row.flow))]));
 }
 
 /**
@@ -145,18 +208,61 @@ async function monthlyTotals(
  *
  * This is the "leftover carries over" rule stated directly: a month that earns
  * more than it spends raises the balance it hands to the next month, and a
- * month that overspends lowers it.
+ * month that overspends lowers it. Lending and repayment ride along in
+ * `debtFlow`, which moves cash without being income or spending.
  */
 function withCarryForward(
-  rows: Array<{ month: string; income: number; expense: number }>,
+  ledger: Array<{ month: string; income: number; expense: number }>,
+  debtFlow: Map<string, number>,
+  openingBalance: number,
 ): MonthlyBucket[] {
-  let running = 0;
-  return rows.map((row) => {
-    const net = round2(row.income - row.expense);
-    const openingBalance = running;
-    running = round2(openingBalance + net);
-    return { ...row, net, openingBalance, closingBalance: running };
+  // A month may have debt movement and no transactions at all, so the set of
+  // months is the union of both sources, not just the ledger's.
+  const months = [...new Set([...ledger.map((r) => r.month), ...debtFlow.keys()])].sort();
+  const byMonth = new Map(ledger.map((row) => [row.month, row]));
+
+  let running = openingBalance;
+  return months.map((month) => {
+    const row = byMonth.get(month);
+    const income = row?.income ?? 0;
+    const expense = row?.expense ?? 0;
+    const net = round2(income - expense);
+    const flow = debtFlow.get(month) ?? 0;
+    const opening = running;
+    running = round2(opening + net + flow);
+    return { month, income, expense, net, debtFlow: flow, openingBalance: opening, closingBalance: running };
   });
+}
+
+/**
+ * The month in progress, synthesised when it has no activity yet so the
+ * dashboard can always say what the month opened with.
+ */
+function buildCurrentMonth(buckets: MonthlyBucket[], openingBalance: number): CurrentMonth {
+  const now = monthKey(new Date());
+  const existing = buckets.find((b) => b.month === now);
+
+  // Everything before this month decides what it opened with.
+  const earlier = buckets.filter((b) => b.month < now);
+  const base: MonthlyBucket = existing ?? {
+    month: now,
+    income: 0,
+    expense: 0,
+    net: 0,
+    debtFlow: 0,
+    openingBalance: earlier.at(-1)?.closingBalance ?? openingBalance,
+    closingBalance: earlier.at(-1)?.closingBalance ?? openingBalance,
+  };
+
+  // The month immediately before, or null when this is the first on record.
+  const previous = earlier.at(-1);
+  const previousNet = previous ? previous.net : null;
+
+  return {
+    ...base,
+    previousNet,
+    deltaVsPrevious: previousNet === null ? null : round2(base.net - previousNet),
+  };
 }
 
 export async function getWalletSummary(
@@ -170,7 +276,7 @@ export async function getWalletSummary(
   const dateFilter = dateRangeFilter(options.startDate, options.endDate);
   const where: Prisma.TransactionWhereInput = { userId, ...(dateFilter ? { date: dateFilter } : {}) };
 
-  const [totals, recent, categoryTotals, monthlyRows, debts] = await Promise.all([
+  const [totals, recent, categoryTotals, monthlyRows, debts, debtFlow, account] = await Promise.all([
     prisma.transaction.groupBy({
       by: ['type'],
       where,
@@ -194,6 +300,8 @@ export async function getWalletSummary(
     }),
     monthlyTotals(userId, options.startDate, options.endDate),
     getDebtTotals(userId),
+    monthlyDebtFlow(userId, options.startDate, options.endDate),
+    prisma.user.findUnique({ where: { id: userId }, select: { openingBalance: true } }),
   ]);
 
   const incomeRow = totals.find((row) => row.type === 'INCOME');
@@ -205,10 +313,15 @@ export async function getWalletSummary(
   const expenseCount = expenseRow?._count._all ?? 0;
 
   const ledgerBalance = round2(totalIncome - totalExpense);
+  const openingBalance = round2(decimalToNumber(account?.openingBalance ?? null));
+  const monthly = withCarryForward(monthlyRows, debtFlow, openingBalance);
 
   return {
-    balance: round2(ledgerBalance + debts.netCashEffect),
+    // The opening balance is money already held, so it sits underneath
+    // everything the ledger and the debts do.
+    balance: round2(openingBalance + ledgerBalance + debts.netCashEffect),
     ledgerBalance,
+    openingBalance,
     totalIncome,
     totalExpense,
     transactionCount: incomeCount + expenseCount,
@@ -220,7 +333,8 @@ export async function getWalletSummary(
       endDate: options.endDate?.toISOString() ?? null,
     },
     debts,
-    monthly: withCarryForward(monthlyRows),
+    monthly,
+    currentMonth: buildCurrentMonth(monthly, openingBalance),
     topCategories: categoryTotals.map((row) => ({
       category: row.category,
       type: row.type,

@@ -48,9 +48,23 @@ export interface MonthlyBucket {
   month: string;
   income: number;
   expense: number;
+  /** income − expense: what the month left over. */
   net: number;
+  /** Cash moved by lending and repayment, signed. Neither income nor spending. */
+  debtFlow: number;
+  /** What the month started with — the previous month's closing balance. */
   openingBalance: number;
   closingBalance: number;
+}
+
+/** The month in progress, and how it compares with the one before. */
+export interface CurrentMonth extends MonthlyBucket {
+  previousNet: number | null;
+  deltaVsPrevious: number | null;
+}
+
+export interface AccountSettings {
+  openingBalance: number;
 }
 
 export interface WalletSummary {
@@ -68,7 +82,10 @@ export interface WalletSummary {
   topCategories: Array<{ category: string; type: TransactionType; total: number; count: number }>;
   recentTransactions: Transaction[];
   debts: DebtTotals;
+  /** Money held before anything was recorded here. */
+  openingBalance: number;
   monthly: MonthlyBucket[];
+  currentMonth: CurrentMonth;
 }
 
 export interface SearchResult {

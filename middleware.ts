@@ -12,7 +12,10 @@ import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
  * `UnauthorizedError` inside the handler and `toErrorResponse` maps it to 401,
  * which keeps the shape consistent with every other error the API returns.
  */
-const isPublicPage = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)']);
+// `/offline` is served by the service worker when there is no network, so it
+// must render without a session — a redirect to sign-in would need the very
+// connection that is missing.
+const isPublicPage = createRouteMatcher(['/sign-in(.*)', '/sign-up(.*)', '/offline']);
 const isApiRoute = createRouteMatcher(['/api/(.*)']);
 
 export default clerkMiddleware(async (auth, request) => {

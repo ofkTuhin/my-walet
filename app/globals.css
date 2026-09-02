@@ -397,3 +397,8 @@
     animation: none !important;
   }
 }
+
+.cl-footerItem {
+  display: none;
+}
+ 
